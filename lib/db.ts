@@ -2,14 +2,26 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 
-const DATA_DIR = path.join(process.cwd(), "data");
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+// Resolves the data directory. AUGEN_DATA_DIR may be absolute (/data on Railway)
+// or relative (defaults to "data" for local dev). Refs live at ${DATA_DIR}/refs.
+export function dataDir(): string {
+  const raw = process.env.AUGEN_DATA_DIR || "data";
+  const abs = path.isAbsolute(raw) ? raw : path.join(process.cwd(), raw);
+  if (!fs.existsSync(abs)) fs.mkdirSync(abs, { recursive: true });
+  return abs;
+}
+
+export function refsDir(): string {
+  const abs = path.join(dataDir(), "refs");
+  if (!fs.existsSync(abs)) fs.mkdirSync(abs, { recursive: true });
+  return abs;
+}
 
 let _db: Database.Database | null = null;
 
 export function db(): Database.Database {
   if (_db) return _db;
-  const filename = path.join(DATA_DIR, "augen.db");
+  const filename = path.join(dataDir(), "augen.db");
   _db = new Database(filename);
   _db.pragma("journal_mode = WAL");
   _db.pragma("foreign_keys = ON");
@@ -378,6 +390,12 @@ function migrate(d: Database.Database) {
     note TEXT
   );
   `);
+
+  // One-time path rewrite: pre-volume references stored as "/refs/<file>".
+  // Move them to "/api/refs/<file>" so the new route serves them.
+  try {
+    d.prepare("UPDATE references_ SET file_path = '/api/refs/' || SUBSTR(file_path, 7) WHERE file_path LIKE '/refs/%'").run();
+  } catch {}
 }
 
 export function nowMs() {

@@ -1,21 +1,20 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { nanoid } from "nanoid";
+import { refsDir } from "@/lib/db";
 
 export type ProviderName = "upload" | "stock" | "generated";
 
 export interface SaveResult {
-  filePath: string;     // absolute on disk under /public/refs/
-  publicPath: string;   // /refs/...
+  filePath: string;     // absolute on disk
+  publicPath: string;   // /api/refs/<name> — served by the route, not Next.js statics
   width?: number;
   height?: number;
   mime: string;
 }
 
-const REFS_DIR = path.join(process.cwd(), "public", "refs");
-
 async function ensureDir() {
-  await fs.mkdir(REFS_DIR, { recursive: true });
+  await fs.mkdir(refsDir(), { recursive: true });
 }
 
 export async function saveUploadedImage(brandSlug: string, file: { name: string; mime: string; bytes: Buffer }): Promise<SaveResult> {
@@ -23,9 +22,9 @@ export async function saveUploadedImage(brandSlug: string, file: { name: string;
   const ext = inferExt(file.mime, file.name);
   const id = nanoid(10);
   const rel = `${brandSlug}-${id}${ext}`;
-  const abs = path.join(REFS_DIR, rel);
+  const abs = path.join(refsDir(), rel);
   await fs.writeFile(abs, file.bytes);
-  return { filePath: abs, publicPath: `/refs/${rel}`, mime: file.mime };
+  return { filePath: abs, publicPath: `/api/refs/${rel}`, mime: file.mime };
 }
 
 // Pexels stock fetch (behind PEXELS_API_KEY).
@@ -154,9 +153,9 @@ export async function saveBytes(brandSlug: string, bytes: Buffer, mime: string):
   await ensureDir();
   const ext = inferExt(mime);
   const rel = `${brandSlug}-${nanoid(10)}${ext}`;
-  const abs = path.join(REFS_DIR, rel);
+  const abs = path.join(refsDir(), rel);
   await fs.writeFile(abs, bytes);
-  return { filePath: abs, publicPath: `/refs/${rel}`, mime };
+  return { filePath: abs, publicPath: `/api/refs/${rel}`, mime };
 }
 
 function inferExt(mime: string, name?: string): string {

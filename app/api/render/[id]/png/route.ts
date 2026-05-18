@@ -17,12 +17,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const refRow = db().prepare("SELECT reference_id FROM generations WHERE id = ?").get(id) as { reference_id: string | null } | undefined;
   const refObj = refRow?.reference_id ? getReference(refRow.reference_id) : null;
   const refUrl = refObj?.file_path
-    ? new URL(refObj.file_path.startsWith("/") ? refObj.file_path : `/refs/${refObj.file_path.split("/").pop()}`, req.url).toString()
+    ? new URL(refObj.file_path.startsWith("/") ? refObj.file_path : `/api/refs/${refObj.file_path.split("/").pop()}`, req.url).toString()
     : undefined;
 
   const overrides = parseOverrides(getGenerationOverrides(id));
   const effectiveRefUrl = overrides.image.replaceUrl
-    ? (overrides.image.replaceUrl.startsWith("/") ? new URL(overrides.image.replaceUrl, req.url).toString() : new URL(`/refs/${overrides.image.replaceUrl}`, req.url).toString())
+    ? (overrides.image.replaceUrl.startsWith("/") ? new URL(overrides.image.replaceUrl, req.url).toString() : new URL(`/api/refs/${overrides.image.replaceUrl}`, req.url).toString())
     : refUrl;
   const svg = renderAdSvg({
     width: gen.width, height: gen.height, aspect: gen.aspect,

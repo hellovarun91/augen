@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const refRow = db().prepare("SELECT reference_id FROM generations WHERE id = ?").get(id) as { reference_id: string | null } | undefined;
   const refObj = refRow?.reference_id ? getReference(refRow.reference_id) : null;
   const referenceUrl = refObj?.file_path
-    ? (refObj.file_path.startsWith("/") ? refObj.file_path : `/refs/${refObj.file_path.split("/").pop()}`)
+    ? (refObj.file_path.startsWith("/") ? refObj.file_path : `/api/refs/${refObj.file_path.split("/").pop()}`)
     : undefined;
 
   const overrides = parseOverrides(getGenerationOverrides(id));
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (overrides.image.replaceUrl) {
     effectiveRefUrl = overrides.image.replaceUrl.startsWith("/")
       ? overrides.image.replaceUrl
-      : `/refs/${overrides.image.replaceUrl}`;
+      : `/api/refs/${overrides.image.replaceUrl}`;
   }
 
   const svg = renderAdSvg({

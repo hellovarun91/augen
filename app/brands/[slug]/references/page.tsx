@@ -85,9 +85,9 @@ export default async function RefsPage({ params }: { params: Promise<{ slug: str
 
 function publicSrc(fp: string | null): string {
   if (!fp) return "";
-  if (fp.startsWith("/refs/")) return fp;
-  // file_path is sometimes absolute under /public/refs — convert
-  const idx = fp.indexOf("/public/refs/");
-  if (idx >= 0) return fp.slice(idx + "/public".length);
-  return fp;
+  if (fp.startsWith("/api/refs/")) return fp;
+  // Legacy shapes: /refs/<name> or absolute /…/public/refs/<name>
+  if (fp.startsWith("/refs/")) return `/api/refs/${fp.slice("/refs/".length)}`;
+  const slash = fp.lastIndexOf("/");
+  return slash >= 0 ? `/api/refs/${fp.slice(slash + 1)}` : `/api/refs/${fp}`;
 }

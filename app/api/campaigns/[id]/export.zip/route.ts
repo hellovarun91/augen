@@ -60,11 +60,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const refRow = db().prepare("SELECT reference_id FROM generations WHERE id = ?").get(g.id) as { reference_id: string | null } | undefined;
     const refObj = refRow?.reference_id ? getReference(refRow.reference_id) : null;
     const refUrl = refObj?.file_path
-      ? (refObj.file_path.startsWith("/") ? refObj.file_path : `/refs/${refObj.file_path.split("/").pop()}`)
+      ? (refObj.file_path.startsWith("/") ? refObj.file_path : `/api/refs/${refObj.file_path.split("/").pop()}`)
       : undefined;
     const overrides = parseOverrides(getGenerationOverrides(g.id));
     const effectiveRefUrl = overrides.image.replaceUrl
-      ? (overrides.image.replaceUrl.startsWith("/") ? overrides.image.replaceUrl : `/refs/${overrides.image.replaceUrl}`)
+      ? (overrides.image.replaceUrl.startsWith("/") ? overrides.image.replaceUrl : `/api/refs/${overrides.image.replaceUrl}`)
       : refUrl;
     const rawSvg = renderAdSvg({
       width: g.width, height: g.height, aspect: g.aspect, tokens: b.tokens,

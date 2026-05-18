@@ -1,6 +1,7 @@
 import { Resvg } from "@resvg/resvg-js";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { refsDir } from "@/lib/db";
 
 export interface RasterizeOptions {
   width?: number;
@@ -20,30 +21,35 @@ export async function rasterizeSvg(svg: string, opts: RasterizeOptions = {}): Pr
   return Buffer.from(png);
 }
 
-// Inlines /refs/{name} image hrefs as base64 data URIs so SVGs can travel standalone.
+// Inlines reference image hrefs as base64 data URIs so SVGs can travel standalone.
+// Recognizes both new /api/refs/<name> and legacy /refs/<name> URL shapes.
 export async function inlineRefImages(svg: string): Promise<string> {
-  const refsDir = path.join(process.cwd(), "public", "refs");
-  // Match href or xlink:href that points to /refs/... OR an absolute URL containing /refs/
+  const primaryDir = refsDir();
+  const legacyDir = path.join(process.cwd(), "public", "refs");
   const pattern = /(href|xlink:href)\s*=\s*"([^"]+?)"/g;
   const replacements: Array<{ match: string; replacement: string }> = [];
   for (const m of svg.matchAll(pattern)) {
     const url = m[2];
     let fileName: string | null = null;
-    const refIdx = url.indexOf("/refs/");
-    if (refIdx >= 0) fileName = url.slice(refIdx + "/refs/".length).split("?")[0].split("#")[0];
-    if (!fileName) continue;
-    try {
-      const abs = path.join(refsDir, fileName);
-      const buf = await fs.readFile(abs);
-      const mime = fileName.endsWith(".png") ? "image/png"
-        : fileName.endsWith(".webp") ? "image/webp"
-        : fileName.endsWith(".gif") ? "image/gif"
-        : "image/jpeg";
-      const dataUri = `data:${mime};base64,${buf.toString("base64")}`;
-      replacements.push({ match: m[0], replacement: `${m[1]}="${dataUri}"` });
-    } catch {
-      // file missing — keep original href
+    const apiIdx = url.indexOf("/api/refs/");
+    const legacyIdx = url.indexOf("/refs/");
+    if (apiIdx >= 0) {
+      fileName = url.slice(apiIdx + "/api/refs/".length).split("?")[0].split("#")[0];
+    } else if (legacyIdx >= 0) {
+      fileName = url.slice(legacyIdx + "/refs/".length).split("?")[0].split("#")[0];
     }
+    if (!fileName) continue;
+    let buf: Buffer | null = null;
+    for (const dir of [primaryDir, legacyDir]) {
+      try { buf = await fs.readFile(path.join(dir, fileName)); break; } catch {}
+    }
+    if (!buf) continue;
+    const mime = fileName.endsWith(".png") ? "image/png"
+      : fileName.endsWith(".webp") ? "image/webp"
+      : fileName.endsWith(".gif") ? "image/gif"
+      : "image/jpeg";
+    const dataUri = `data:${mime};base64,${buf.toString("base64")}`;
+    replacements.push({ match: m[0], replacement: `${m[1]}="${dataUri}"` });
   }
   let out = svg;
   for (const r of replacements) out = out.replace(r.match, r.replacement);
