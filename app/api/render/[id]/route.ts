@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
-import { getBrand, getGeneration } from "@/lib/repo";
+import { getBrand, getGeneration, getReference } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
+import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     headline: gen.headline, subhead: gen.subhead || "", cta: gen.cta, eyebrow: gen.eyebrow || undefined,
   };
 
+  const refRow = db().prepare("SELECT reference_id FROM generations WHERE id = ?").get(id) as { reference_id: string | null } | undefined;
+  const refObj = refRow?.reference_id ? getReference(refRow.reference_id) : null;
+  const referenceUrl = refObj?.file_path
+    ? (refObj.file_path.startsWith("/") ? refObj.file_path : `/refs/${refObj.file_path.split("/").pop()}`)
+    : undefined;
+
   const svg = renderAdSvg({
     width: gen.width,
     height: gen.height,
@@ -33,6 +40,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     showLocker,
     showScrim,
     bareBackground: bare,
+    referenceUrl: referenceUrl ? new URL(referenceUrl, req.url).toString() : undefined,
   });
 
   return new Response(svg, {

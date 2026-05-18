@@ -18,6 +18,7 @@ export interface RenderArgs {
   showLocker?: boolean;
   showScrim?: boolean;
   bareBackground?: boolean;
+  referenceUrl?: string; // public path like /refs/foo.jpg, embeds into the SVG
 }
 
 export function renderAdSvg(args: RenderArgs): string {
@@ -33,9 +34,11 @@ export function renderAdSvg(args: RenderArgs): string {
     tokens.palette.muted,
   ];
 
-  const bg = args.bareBackground
-    ? `<rect width="${width}" height="${height}" fill="${tokens.palette.background}"/>`
-    : buildBackground({ width, height, seed, palette, style });
+  const bg = args.referenceUrl
+    ? buildPhotoBackground(args.referenceUrl, width, height)
+    : args.bareBackground
+      ? `<rect width="${width}" height="${height}" fill="${tokens.palette.background}"/>`
+      : buildBackground({ width, height, seed, palette, style });
 
   const scrim = args.showScrim !== false ? buildScrim(width, layout.scrim.yStart, layout.scrim.height, tokens) : "";
 
@@ -51,6 +54,12 @@ ${bg}
 ${scrim}
 ${text}
 </svg>`;
+}
+
+function buildPhotoBackground(refUrl: string, width: number, height: number): string {
+  // Resolve to absolute file:// for SVG renderers? Browser fetches OK with absolute /refs/ path
+  // when SVG is served as image. We use xlink:href for compatibility with both renderers.
+  return `<image href="${escapeXml(refUrl)}" x="0" y="0" width="${width}" height="${height}" preserveAspectRatio="xMidYMid slice"/>`;
 }
 
 function buildScrim(width: number, yStart: number, h: number, tokens: BrandTokens): string {

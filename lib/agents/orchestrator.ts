@@ -5,7 +5,7 @@ import { runArtDirector } from "./art-director";
 import { runCopywriter } from "./copywriter";
 import { runCritic } from "./critic";
 import { formatBySlug } from "@/lib/formats";
-import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences } from "@/lib/repo";
+import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference } from "@/lib/repo";
 import type { AgentProvider } from "./types";
 
 const PROVIDER: AgentProvider = { name: "mock", model: "augen-mock@1" };
@@ -31,7 +31,8 @@ export async function generateAdsViaAgents(args: {
   if (!ideas.length) {
     throw new Error("No ideas — run the Strategist or write ideas first.");
   }
-  const refs = listReferences(args.brand.id).filter((r) => r.selected).map((r) => r.label || r.file_path || r.source);
+  const allRefs = listReferences(args.brand.id).filter((r) => r.selected);
+  const refs = allRefs.map((r) => r.label || r.file_path || r.source);
   const variantsPerFormat = args.variantsPerFormat || 1;
   const chainId = newChainId();
   setCampaignStatus(args.campaignId, "generating");
@@ -139,6 +140,12 @@ export async function generateAdsViaAgents(args: {
         // Mock billing
         if (getBilling(args.brand.id)) {
           chargeBilling(args.brand.id, COST_PER_AD_CENTS, `Generation · ${fmt.name}`, gen.id);
+        }
+
+        // Assign a reference to this generation if any are selected. Deterministic round-robin.
+        if (allRefs.length) {
+          const pick = allRefs[count % allRefs.length];
+          if (pick.file_path) updateGenerationReference(gen.id, pick.id);
         }
 
         count++;

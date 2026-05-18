@@ -268,6 +268,10 @@ export function updateGenerationStatus(id: string, status: string, note?: string
   );
 }
 
+export function updateGenerationReference(generationId: string, referenceId: string | null) {
+  db().prepare("UPDATE generations SET reference_id = ?, updated_at = ? WHERE id = ?").run(referenceId, nowMs(), generationId);
+}
+
 export function updateGenerationCopy(id: string, copy: { headline: string; subhead: string; cta: string; eyebrow?: string }) {
   db().prepare(`UPDATE generations SET headline = ?, subhead = ?, cta = ?, eyebrow = ?, updated_at = ? WHERE id = ?`).run(
     copy.headline, copy.subhead, copy.cta, copy.eyebrow || null, nowMs(), id,
