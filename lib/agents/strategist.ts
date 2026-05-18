@@ -1,6 +1,7 @@
 import type { StrategistInput, StrategistOutput } from "./types";
 import { hashStr, pick, pickN, rng } from "@/lib/ai/rand";
-import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
+import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import type { AgentUsage } from "./persistence";
 
 // Re-uses the planner's idea taxonomy but produces output as if a strategist agent reasoned about it.
 // The rationale field is the visible "thinking" trace the operator sees in the chain UI.
@@ -27,7 +28,7 @@ const VISUAL_DIRECTIONS = [
   "Wide environmental shot, golden hour, subject small in frame, copy lives in sky.",
 ];
 
-export async function runStrategist(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string }> {
+export async function runStrategist(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string; usage?: AgentUsage }> {
   if (getClaude()) {
     try {
       return await runStrategistClaude(input);
@@ -38,7 +39,7 @@ export async function runStrategist(input: StrategistInput): Promise<{ output: S
   return runStrategistMock(input);
 }
 
-async function runStrategistClaude(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string }> {
+async function runStrategistClaude(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string; usage: AgentUsage }> {
   const client = getClaude()!;
   const system = [
     {
@@ -95,7 +96,7 @@ async function runStrategistClaude(input: StrategistInput): Promise<{ output: St
   });
 
   const out = extractToolUse<{ rationale: string; ideas: StrategistOutput["ideas"] }>(resp, "emit_ideas");
-  return { output: { rationale: out.rationale, ideas: out.ideas }, rationale: out.rationale };
+  return { output: { rationale: out.rationale, ideas: out.ideas }, rationale: out.rationale, usage: extractUsage(resp) };
 }
 
 async function runStrategistMock(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string }> {

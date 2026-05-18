@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { SidebarNav } from "./sidebar-nav";
 import { BrandSwitcher } from "./brand-switcher";
+import { UsageChip } from "./usage-chip";
 
 export async function Sidebar() {
   const { user, brands, activeBrand } = await getSession();
@@ -21,6 +22,12 @@ export async function Sidebar() {
       )}
 
       <SidebarNav user={user ? { id: user.id, name: user.name, email: user.email, color: user.avatar_color } : null} activeBrand={activeBrand ? { id: activeBrand.id, slug: activeBrand.slug, name: activeBrand.name } : null} />
+
+      {user && (
+        <div className="px-4 pb-3">
+          <UsageChip />
+        </div>
+      )}
     </aside>
   );
 }

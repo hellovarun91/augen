@@ -1,8 +1,9 @@
 import type { CriticInput, CriticOutput } from "./types";
 import { formatBySlug } from "@/lib/formats";
-import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
+import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import type { AgentUsage } from "./persistence";
 
-export async function runCritic(input: CriticInput): Promise<{ output: CriticOutput; rationale: string }> {
+export async function runCritic(input: CriticInput): Promise<{ output: CriticOutput; rationale: string; usage?: AgentUsage }> {
   if (getClaude()) {
     try { return await runCriticClaude(input); }
     catch (e: any) { console.warn("[critic] Claude failed, falling back to mock:", e?.message || e); }
@@ -10,7 +11,7 @@ export async function runCritic(input: CriticInput): Promise<{ output: CriticOut
   return runCriticMock(input);
 }
 
-async function runCriticClaude(input: CriticInput): Promise<{ output: CriticOutput; rationale: string }> {
+async function runCriticClaude(input: CriticInput): Promise<{ output: CriticOutput; rationale: string; usage: AgentUsage }> {
   const client = getClaude()!;
   const fmt = formatBySlug(input.formatSlug);
   const system = [
@@ -69,6 +70,7 @@ async function runCriticClaude(input: CriticInput): Promise<{ output: CriticOutp
       verdict: out.verdict, notes: out.notes, revisionNote: out.revisionNote,
     },
     rationale: out.rationale,
+    usage: extractUsage(resp),
   };
 }
 

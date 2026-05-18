@@ -77,3 +77,14 @@ export function extractToolUse<T = any>(resp: Anthropic.Messages.Message, toolNa
   }
   throw new Error(`Claude did not call tool ${toolName}. Stop reason: ${resp.stop_reason}`);
 }
+
+// Helper: pull token usage from a Claude response in a shape recordRun accepts.
+export function extractUsage(resp: Anthropic.Messages.Message) {
+  const u: any = resp.usage || {};
+  return {
+    input_tokens: u.input_tokens || 0,
+    output_tokens: u.output_tokens || 0,
+    cache_creation_input_tokens: u.cache_creation_input_tokens || 0,
+    cache_read_input_tokens: u.cache_read_input_tokens || 0,
+  };
+}

@@ -2,6 +2,7 @@
 import { getBrand, getIdea, getCampaign, createCopyVariant, starCopyVariant, deleteCopyVariant } from "@/lib/repo";
 import { runCopywriter } from "@/lib/agents/copywriter";
 import { recordRun, newChainId } from "@/lib/agents/persistence";
+import { claudeModel, getClaude } from "@/lib/agents/adapters/claude";
 import { revalidatePath } from "next/cache";
 
 export async function spinVariantsAction(
@@ -22,7 +23,7 @@ export async function spinVariantsAction(
     brandId: brand.id,
     campaignId,
     ideaId,
-    provider: { name: "mock", model: "augen-mock@1" },
+    provider: getClaude() ? { name: "claude", model: claudeModel() } : { name: "mock", model: "augen-mock@1" },
     input: { formatSlug: opts.formatSlug, count: opts.count, constraint: opts.constraint, carryForward: opts.carryForward?.length || 0 },
     fn: () => runCopywriter({
       brand,

@@ -31,6 +31,7 @@ export function SidebarNav({
     { href: "/review", label: "Review queue" },
     { href: "/formats", label: "Format catalog" },
     { href: "/providers", label: "AI providers" },
+    { href: "/usage", label: "Usage & cost" },
   ];
 
   const launchNav = [

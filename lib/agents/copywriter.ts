@@ -1,6 +1,7 @@
 import type { CopyVariant, CopywriterInput, CopywriterOutput } from "./types";
 import { hashStr, pick, pickN, rng } from "@/lib/ai/rand";
-import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
+import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import type { AgentUsage } from "./persistence";
 import { formatBySlug } from "@/lib/formats";
 
 const HEADLINE_TEMPLATES = [
@@ -90,7 +91,7 @@ const PROMISES = [
 
 const FLAVORS = ["citrus", "grapefruit", "yuzu", "lavender", "fig", "smoked salt", "honey", "pear", "amaranth", "rosemary"];
 
-export async function runCopywriter(input: CopywriterInput): Promise<{ output: CopywriterOutput; rationale: string }> {
+export async function runCopywriter(input: CopywriterInput): Promise<{ output: CopywriterOutput; rationale: string; usage?: AgentUsage }> {
   if (getClaude()) {
     try { return await runCopywriterClaude(input); }
     catch (e: any) { console.warn("[copywriter] Claude failed, falling back to mock:", e?.message || e); }
@@ -98,7 +99,7 @@ export async function runCopywriter(input: CopywriterInput): Promise<{ output: C
   return runCopywriterMock(input);
 }
 
-async function runCopywriterClaude(input: CopywriterInput): Promise<{ output: CopywriterOutput; rationale: string }> {
+async function runCopywriterClaude(input: CopywriterInput): Promise<{ output: CopywriterOutput; rationale: string; usage: AgentUsage }> {
   const client = getClaude()!;
   const fmt = formatBySlug(input.formatSlug);
   const ratio = fmt ? fmt.width / fmt.height : 1;
@@ -160,7 +161,7 @@ async function runCopywriterClaude(input: CopywriterInput): Promise<{ output: Co
   });
 
   const out = extractToolUse<{ rationale: string; variants: CopyVariant[] }>(resp, "emit_variants");
-  return { output: { rationale: out.rationale, variants: out.variants }, rationale: out.rationale };
+  return { output: { rationale: out.rationale, variants: out.variants }, rationale: out.rationale, usage: extractUsage(resp) };
 }
 
 async function runCopywriterMock(input: CopywriterInput): Promise<{ output: CopywriterOutput; rationale: string }> {

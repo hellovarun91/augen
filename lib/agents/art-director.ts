@@ -1,6 +1,7 @@
 import type { ArtDirectorInput, ArtDirectorOutput } from "./types";
 import { hashStr, pick, rng } from "@/lib/ai/rand";
-import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
+import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import type { AgentUsage } from "./persistence";
 
 const COMPOSITIONS = [
   "Rule-of-thirds, subject upper-left, generous negative space lower-right.",
@@ -35,7 +36,7 @@ const SUBJECTS_BY_INDUSTRY: Record<string, string[]> = {
   lifestyle: ["A subject mid-laugh at a doorway, soft light flooding in.", "A still life of three brand objects on a stone surface.", "An object in use — hand, garment, room — at golden hour.", "A breakfast scene mid-pour, atmosphere over object."],
 };
 
-export async function runArtDirector(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string }> {
+export async function runArtDirector(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string; usage?: AgentUsage }> {
   if (getClaude()) {
     try { return await runArtDirectorClaude(input); }
     catch (e: any) { console.warn("[art_director] Claude failed, falling back to mock:", e?.message || e); }
@@ -43,7 +44,7 @@ export async function runArtDirector(input: ArtDirectorInput): Promise<{ output:
   return runArtDirectorMock(input);
 }
 
-async function runArtDirectorClaude(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string }> {
+async function runArtDirectorClaude(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string; usage: AgentUsage }> {
   const client = getClaude()!;
   const lang = (input.brand as any).language;
   const system = [
@@ -95,7 +96,7 @@ async function runArtDirectorClaude(input: ArtDirectorInput): Promise<{ output: 
 
   const out = extractToolUse<Omit<ArtDirectorOutput, "seed">>(resp, "emit_direction");
   const seed = hashStr(`${input.brand.slug}|${input.idea.theme}|${input.formatSlug}|${input.variantIndex}`);
-  return { output: { ...out, seed }, rationale: out.rationale };
+  return { output: { ...out, seed }, rationale: out.rationale, usage: extractUsage(resp) };
 }
 
 async function runArtDirectorMock(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string }> {

@@ -8,8 +8,13 @@ import { formatBySlug } from "@/lib/formats";
 import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference, createReference } from "@/lib/repo";
 import { generateImage, saveBytes } from "@/lib/images/providers";
 import type { AgentProvider } from "./types";
+import { claudeModel, getClaude } from "./adapters/claude";
 
-const PROVIDER: AgentProvider = { name: "mock", model: "augen-mock@1" };
+function currentProvider(): AgentProvider {
+  return getClaude()
+    ? { name: "claude", model: claudeModel() }
+    : { name: "mock", model: "augen-mock@1" };
+}
 const COST_PER_AD_CENTS = 16;
 
 export interface GenerateChainResult {
@@ -57,7 +62,7 @@ export async function generateAdsViaAgents(args: {
           brandId: args.brand.id,
           campaignId: args.campaignId,
           ideaId: idea.id,
-          provider: PROVIDER,
+          provider: currentProvider(),
           input: { brandSlug: args.brand.slug, idea: idea.theme, product, formatSlug, variantIndex: v },
           fn: () => runArtDirector({
             brand: args.brand,
@@ -79,7 +84,7 @@ export async function generateAdsViaAgents(args: {
           brandId: args.brand.id,
           campaignId: args.campaignId,
           ideaId: idea.id,
-          provider: PROVIDER,
+          provider: currentProvider(),
           input: { idea: idea.theme, product, formatSlug, count: 3, constraint: args.copyConstraint },
           fn: () => runCopywriter({
             brand: args.brand,
@@ -104,7 +109,7 @@ export async function generateAdsViaAgents(args: {
           brandId: args.brand.id,
           campaignId: args.campaignId,
           ideaId: idea.id,
-          provider: PROVIDER,
+          provider: currentProvider(),
           input: { copy: chosen, formatSlug, idea: idea.theme },
           fn: () => runCritic({
             brand: args.brand,
@@ -193,7 +198,7 @@ export async function strategistOnly(args: {
     chainId,
     brandId: args.brand.id,
     campaignId: args.campaignId,
-    provider: PROVIDER,
+    provider: currentProvider(),
     input: { brief: args.brief, quarter: args.quarter, year: args.year, count: args.count, notes: args.notes },
     fn: () => runStrategist({
       brand: args.brand,
