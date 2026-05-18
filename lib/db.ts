@@ -334,6 +334,41 @@ function migrate(d: Database.Database) {
 
   try { d.prepare("ALTER TABLE generations ADD COLUMN variation_batch_id TEXT").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN variation_row_json TEXT").run(); } catch {}
+
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS feature_flags (
+    name TEXT PRIMARY KEY,
+    description TEXT,
+    enabled_globally INTEGER NOT NULL DEFAULT 0,
+    default_on_for_admins INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS feature_flag_user_overrides (
+    flag_name TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    enabled INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (flag_name, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id TEXT PRIMARY KEY,
+    admin_user_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_user_id TEXT,
+    target_brand_id TEXT,
+    payload_json TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS aal_admin_idx ON admin_audit_log(admin_user_id);
+  CREATE INDEX IF NOT EXISTS aal_target_idx ON admin_audit_log(target_user_id);
+  CREATE INDEX IF NOT EXISTS aal_created_idx ON admin_audit_log(created_at);
+  `);
+
+  try { d.prepare("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'").run(); } catch {}
+  try { d.prepare("ALTER TABLE users ADD COLUMN last_seen_at INTEGER").run(); } catch {}
 }
 
 export function nowMs() {

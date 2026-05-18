@@ -7,9 +7,11 @@ import { signOutAction } from "@/app/signin/actions";
 export function SidebarNav({
   user,
   activeBrand,
+  isAdmin = false,
 }: {
   user: { id: string; name: string; email: string; color: string } | null;
   activeBrand: { id: string; slug: string; name: string } | null;
+  isAdmin?: boolean;
 }) {
   const path = usePathname() || "/";
 
@@ -61,6 +63,14 @@ export function SidebarNav({
           <NavItem key={n.href} href={n.href} label={n.label} note={n.note} active={path === n.href} />
         ))}
       </Section>
+
+      {isAdmin && (
+        <Section label="Admin">
+          <NavItem href="/admin" label="Overview" active={path === "/admin"} />
+          <NavItem href="/admin/users" label="Users" active={path.startsWith("/admin/users")} />
+          <NavItem href="/admin/features" label="Feature flags" active={path === "/admin/features"} />
+        </Section>
+      )}
 
       <div className="mt-auto p-4 border-t border-white/5">
         {user ? (

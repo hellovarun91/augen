@@ -3,9 +3,11 @@ import { getSession } from "@/lib/session";
 import { SidebarNav } from "./sidebar-nav";
 import { BrandSwitcher } from "./brand-switcher";
 import { CreditsChip } from "./credits-chip";
+import { isAdmin } from "@/lib/admin";
 
 export async function Sidebar() {
   const { user, brands, activeBrand } = await getSession();
+  const admin = isAdmin(user);
   return (
     <aside className="hidden md:flex md:flex-col w-64 border-r border-white/5 bg-ink-950/70 backdrop-blur-md min-h-screen sticky top-0">
       <Link href="/" className="px-5 py-5 block">
@@ -21,7 +23,11 @@ export async function Sidebar() {
         </div>
       )}
 
-      <SidebarNav user={user ? { id: user.id, name: user.name, email: user.email, color: user.avatar_color } : null} activeBrand={activeBrand ? { id: activeBrand.id, slug: activeBrand.slug, name: activeBrand.name } : null} />
+      <SidebarNav
+        user={user ? { id: user.id, name: user.name, email: user.email, color: user.avatar_color } : null}
+        activeBrand={activeBrand ? { id: activeBrand.id, slug: activeBrand.slug, name: activeBrand.name } : null}
+        isAdmin={admin}
+      />
 
       {user && (
         <div className="px-4 pb-3">

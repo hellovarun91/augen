@@ -1,51 +1,9 @@
 import { db, nowMs } from "./db";
 import { nanoid } from "nanoid";
+import { TIERS, type Tier, type TierDef } from "./tiers";
 
-export type Tier = "trial" | "studio" | "pro" | "enterprise";
-
-export interface TierDef {
-  id: Tier;
-  label: string;
-  monthlyGrant: number;
-  resetsMonthly: boolean;
-  pricePerMonthUsd: number | null;
-  description: string;
-}
-
-export const TIERS: Record<Tier, TierDef> = {
-  trial: {
-    id: "trial",
-    label: "Trial",
-    monthlyGrant: numEnv("AUGEN_TIER_TRIAL_CREDITS", 50),
-    resetsMonthly: false,
-    pricePerMonthUsd: 0,
-    description: "Get a feel for the studio. Credits don't reset.",
-  },
-  studio: {
-    id: "studio",
-    label: "Studio",
-    monthlyGrant: numEnv("AUGEN_TIER_STUDIO_CREDITS", 500),
-    resetsMonthly: true,
-    pricePerMonthUsd: 29,
-    description: "Solo operators and small teams. ~100 ads / month.",
-  },
-  pro: {
-    id: "pro",
-    label: "Pro",
-    monthlyGrant: numEnv("AUGEN_TIER_PRO_CREDITS", 2000),
-    resetsMonthly: true,
-    pricePerMonthUsd: 99,
-    description: "Multi-brand teams. ~400 ads / month with real images.",
-  },
-  enterprise: {
-    id: "enterprise",
-    label: "Enterprise",
-    monthlyGrant: numEnv("AUGEN_TIER_ENTERPRISE_CREDITS", 20000),
-    resetsMonthly: true,
-    pricePerMonthUsd: null,
-    description: "Custom contracts. Talk to us.",
-  },
-};
+export { TIERS };
+export type { Tier, TierDef };
 
 // Price of each action in credits. 1 credit ≈ $0.02 retail.
 // Tuned so a Claude-only ad costs ~5 credits (~$0.10 retail vs ~$0.04 raw cost = ~150% markup).

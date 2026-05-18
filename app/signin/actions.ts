@@ -12,6 +12,9 @@ export async function signInAction(fd: FormData) {
   }
   let user = getUserByEmail(email);
   if (!user) user = createUser(email, name, pickAvatarColor(email));
+  if ((user as any).status === "disabled") {
+    throw new Error("This account is disabled. Contact your studio admin.");
+  }
   await setCurrentUser(user.id);
   redirect("/");
 }
