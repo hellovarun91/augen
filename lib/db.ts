@@ -315,7 +315,25 @@ function migrate(d: Database.Database) {
   );
   CREATE INDEX IF NOT EXISTS ct_user_idx ON credit_transactions(user_id);
   CREATE INDEX IF NOT EXISTS ct_kind_idx ON credit_transactions(kind);
+
+  CREATE TABLE IF NOT EXISTS variation_batches (
+    id TEXT PRIMARY KEY,
+    idea_id TEXT NOT NULL REFERENCES ideas(id) ON DELETE CASCADE,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    strategy TEXT NOT NULL,
+    slots_json TEXT NOT NULL,
+    formats_json TEXT NOT NULL,
+    generations_count INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS vb_idea_idx ON variation_batches(idea_id);
+  CREATE INDEX IF NOT EXISTS vb_campaign_idx ON variation_batches(campaign_id);
   `);
+
+  try { d.prepare("ALTER TABLE generations ADD COLUMN variation_batch_id TEXT").run(); } catch {}
+  try { d.prepare("ALTER TABLE generations ADD COLUMN variation_row_json TEXT").run(); } catch {}
 }
 
 export function nowMs() {

@@ -79,6 +79,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                     <div className="flex items-center gap-2">
                       <Badge>{ideaGens.length} ads</Badge>
                       <Link href={`/campaigns/${campaign.id}/ideas/${idea.id}/lab`} className="text-xs text-ink-200 hover:text-white">Copy Lab →</Link>
+                      <Link href={`/campaigns/${campaign.id}/ideas/${idea.id}/variations`} className="text-xs text-ink-200 hover:text-white">Variations →</Link>
                     </div>
                   </div>
                   <div className="text-sm text-ink-200">{idea.insight}</div>
