@@ -1,0 +1,116 @@
+"use client";
+import { Button, Card, Eyebrow, Label } from "@/components/ui/primitives";
+import type { Campaign } from "@/lib/types";
+import { useState, useTransition } from "react";
+import { runCampaignAction, saveBriefAction } from "./actions";
+import type { FormatSpec } from "@/lib/formats";
+
+export function RunCampaignButton({ campaignId, ideaCount }: { campaignId: string; ideaCount: number }) {
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <form
+      action={() => start(async () => {
+        setErr(null);
+        try { await runCampaignAction(campaignId); } catch (e: any) { setErr(e?.message || "Run failed"); }
+      })}
+    >
+      <Button type="submit" size="md" disabled={pending || ideaCount === 0}>
+        {pending ? "Generating…" : "Generate ads →"}
+      </Button>
+      {err && <div className="text-xs text-rose-300 mt-1">{err}</div>}
+    </form>
+  );
+}
+
+export function BriefEditor({ campaign, groupedFormats }: { campaign: Campaign; groupedFormats: Record<string, FormatSpec[]> }) {
+  const [enabled, setEnabled] = useState<Set<string>>(new Set(campaign.brief.formats));
+  const [audience, setAudience] = useState(campaign.audience || "");
+  const [notes, setNotes] = useState(campaign.brief.notes || "");
+  const [variants, setVariants] = useState(1);
+  const [pending, start] = useTransition();
+  const [saved, setSaved] = useState(false);
+
+  function toggle(slug: string) {
+    const next = new Set(enabled);
+    if (next.has(slug)) next.delete(slug); else next.add(slug);
+    setEnabled(next);
+  }
+  function toggleAllPlatform(platform: string) {
+    const list = groupedFormats[platform];
+    const allOn = list.every((f) => enabled.has(f.slug));
+    const next = new Set(enabled);
+    if (allOn) list.forEach((f) => next.delete(f.slug));
+    else list.forEach((f) => next.add(f.slug));
+    setEnabled(next);
+  }
+
+  function onSave() {
+    start(async () => {
+      await saveBriefAction(campaign.id, {
+        audience,
+        notes,
+        formats: Array.from(enabled),
+        variantsPerFormat: variants,
+      });
+      setSaved(true); setTimeout(() => setSaved(false), 1500);
+    });
+  }
+
+  return (
+    <Card className="p-6 space-y-6">
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Audience</Label>
+          <input value={audience} onChange={(e) => setAudience(e.target.value)} className="w-full rounded-lg bg-ink-800 px-3 py-2 text-sm text-ink-50 ring-1 ring-inset ring-white/10" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Variants per format</Label>
+          <select value={variants} onChange={(e) => setVariants(parseInt(e.target.value, 10))} className="w-full rounded-lg bg-ink-800 px-3 py-2 text-sm text-ink-50 ring-1 ring-inset ring-white/10">
+            {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <Eyebrow>Notes</Eyebrow>
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-2 w-full rounded-lg bg-ink-800 px-3 py-2 text-sm text-ink-50 ring-1 ring-inset ring-white/10" />
+      </div>
+
+      <div className="space-y-4">
+        <Eyebrow>Format coverage</Eyebrow>
+        {Object.entries(groupedFormats).map(([platform, list]) => (
+          <div key={platform} className="rounded-xl ring-1 ring-white/5 bg-ink-900/60 p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm text-ink-100 font-medium">{platform}</div>
+              <button onClick={() => toggleAllPlatform(platform)} className="text-xs text-ink-400 hover:text-ink-100">Toggle all</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {list.map((f) => {
+                const on = enabled.has(f.slug);
+                return (
+                  <button
+                    key={f.slug}
+                    onClick={() => toggle(f.slug)}
+                    className={
+                      "text-xs rounded-full px-3 py-1.5 ring-1 transition-colors " +
+                      (on ? "bg-ink-50 text-ink-950 ring-ink-50" : "bg-ink-800 text-ink-200 ring-white/10 hover:bg-ink-700")
+                    }
+                  >
+                    {f.name} · {f.width}×{f.height}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button onClick={onSave} disabled={pending}>{pending ? "Saving…" : "Save brief"}</Button>
+        {saved && <span className="text-xs text-emerald-300">Saved.</span>}
+        <div className="text-xs text-ink-400 ml-auto">Enabled: {enabled.size} formats × {variants} variants per idea seed</div>
+      </div>
+    </Card>
+  );
+}

@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.turbo/
+out/
+data/*.db*
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+tsconfig.tsbuildinfo
+
+# Local tooling
+.claude/
+.vscode/
+.idea/

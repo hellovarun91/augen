@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Söhne", "Inter", "Helvetica Neue", system-ui, -apple-system, sans-serif;
+  --font-serif: "Tiempos Headline", "GT Sectra", "Playfair Display", Georgia, serif;
+}
+
+html, body {
+  background: #0A0A0B;
+  color: #E7E7EC;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Subtle grid background used on landing */
+.bg-dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+/* Pretty scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+
+/* Form reset */
+input, textarea, select, button { font-family: inherit; color: inherit; }
+input:focus, textarea:focus, select:focus { outline: none; }
+
+/* Editorial type rule */
+.eyebrow {
+  font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: #9A9AA8;
+}
+
+.serif { font-family: var(--font-serif); }
