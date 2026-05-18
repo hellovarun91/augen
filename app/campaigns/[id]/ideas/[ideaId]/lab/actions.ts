@@ -4,17 +4,21 @@ import { runCopywriter } from "@/lib/agents/copywriter";
 import { recordRun, newChainId } from "@/lib/agents/persistence";
 import { claudeModel, getClaude } from "@/lib/agents/adapters/claude";
 import { revalidatePath } from "next/cache";
+import { requireIdeaAccess, requireCampaignAccess } from "@/lib/authz";
+import { chargeCredits } from "@/lib/credits";
+import { rateLimit } from "@/lib/ratelimit";
 
 export async function spinVariantsAction(
   campaignId: string,
   ideaId: string,
   opts: { formatSlug: string; count: number; constraint?: string; carryForward?: string[] },
 ) {
-  const campaign = getCampaign(campaignId);
-  const idea = getIdea(ideaId);
-  if (!campaign || !idea) throw new Error("Campaign or idea missing");
+  const { user, idea, campaign } = await requireIdeaAccess(ideaId);
+  if (idea.campaign_id !== campaignId) throw new Error("Idea does not belong to this campaign");
+  await rateLimit(user.id, "spin_variants", { perMinute: 10 });
   const brand = getBrand(campaign.brand_id);
   if (!brand) throw new Error("Brand missing");
+  chargeCredits({ userId: user.id, action: "spin_variants", description: `Spin ${opts.count}`, refId: ideaId });
 
   const chainId = newChainId();
   const run = await recordRun({
@@ -55,11 +59,16 @@ export async function spinVariantsAction(
 }
 
 export async function starVariantAction(variantId: string, starred: boolean) {
+  // Light-touch: only authenticated users can flip stars. Variants are scoped to ideas → campaigns → brand-membership.
+  const { requireUser } = await import("@/lib/authz");
+  await requireUser();
   starCopyVariant(variantId, starred);
   revalidatePath("/campaigns/[id]/ideas/[ideaId]/lab", "page");
 }
 
 export async function deleteVariantAction(variantId: string) {
+  const { requireUser } = await import("@/lib/authz");
+  await requireUser();
   deleteCopyVariant(variantId);
   revalidatePath("/campaigns/[id]/ideas/[ideaId]/lab", "page");
 }

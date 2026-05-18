@@ -9,8 +9,12 @@ import { runCritic } from "@/lib/agents/critic";
 import { refineRulesFromReviews } from "@/lib/agents/rule-refiner";
 import { recordRun, newChainId } from "@/lib/agents/persistence";
 import { claudeModel, getClaude } from "@/lib/agents/adapters/claude";
+import { requireBrandAccess } from "@/lib/authz";
+import { chargeCredits } from "@/lib/credits";
+import { rateLimit } from "@/lib/ratelimit";
 
 export async function saveLanguage(brandId: string, language: BrandLanguage) {
+  await requireBrandAccess(brandId);
   const parsed = BrandLanguage.parse(language);
   updateBrandLanguage(brandId, parsed);
   revalidatePath("/brands/[slug]/language", "page");
@@ -18,6 +22,9 @@ export async function saveLanguage(brandId: string, language: BrandLanguage) {
 }
 
 export async function runRuleRefinerAction(brandId: string, brandSlug: string) {
+  const user = await requireBrandAccess(brandId);
+  await rateLimit(user.id, "rule_refiner", { perMinute: 3 });
+  chargeCredits({ userId: user.id, action: "rule_refiner", description: "Rule refiner", refId: brandId });
   const brand = getBrand(brandId);
   if (!brand) throw new Error("Brand missing");
   const chainId = newChainId();
@@ -44,6 +51,7 @@ export async function runRuleRefinerAction(brandId: string, brandSlug: string) {
 export async function acceptProposalAction(proposalId: string, brandSlug: string) {
   const p = getRuleProposal(proposalId);
   if (!p) throw new Error("Proposal not found");
+  await requireBrandAccess(p.brand_id);
   const brand = getBrand(p.brand_id);
   if (!brand) throw new Error("Brand missing");
   const lang = brand.language;
@@ -57,6 +65,9 @@ export async function acceptProposalAction(proposalId: string, brandSlug: string
 }
 
 export async function dismissProposalAction(proposalId: string, brandSlug: string) {
+  const p = getRuleProposal(proposalId);
+  if (!p) throw new Error("Proposal not found");
+  await requireBrandAccess(p.brand_id);
   updateRuleProposalStatus(proposalId, "dismissed");
   revalidatePath(`/brands/${brandSlug}/language`);
 }
@@ -69,6 +80,9 @@ export async function criticPreview(
   copy: { headline: string; subhead: string; cta: string; eyebrow?: string },
   formatSlug: string,
 ) {
+  const user = await requireBrandAccess(brandId);
+  await rateLimit(user.id, "critic_preview", { perMinute: 20 });
+  chargeCredits({ userId: user.id, action: "critic_preview", description: "Critic preview", refId: brandId });
   const brand = getBrand(brandId);
   if (!brand) throw new Error("Brand missing");
   const parsedLang = BrandLanguage.parse(language);

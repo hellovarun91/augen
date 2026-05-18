@@ -3,8 +3,10 @@ import { planQuarter, plannedToBrief } from "@/lib/ai/planner";
 import { createCampaign, createIdea, getBrand } from "@/lib/repo";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireBrandAccess } from "@/lib/authz";
 
 export async function acceptPlan(brandId: string, quarter: string, year: number) {
+  await requireBrandAccess(brandId);
   const brand = getBrand(brandId);
   if (!brand) throw new Error("Brand not found");
   const planned = planQuarter(brand, year, quarter as "Q1" | "Q2" | "Q3" | "Q4");

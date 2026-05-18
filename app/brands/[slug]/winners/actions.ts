@@ -1,8 +1,11 @@
 "use server";
 import { createExternalWinner, deleteExternalWinner } from "@/lib/repo";
 import { revalidatePath } from "next/cache";
+import { requireBrandAccess } from "@/lib/authz";
+import { db } from "@/lib/db";
 
 export async function addWinnerAction(brandId: string, brandSlug: string, fd: FormData) {
+  await requireBrandAccess(brandId);
   const headline = String(fd.get("headline") || "").trim();
   if (!headline) throw new Error("Headline required");
   createExternalWinner({
@@ -20,11 +23,15 @@ export async function addWinnerAction(brandId: string, brandSlug: string, fd: Fo
 }
 
 export async function deleteWinnerAction(id: string) {
+  const row = db().prepare("SELECT brand_id FROM external_winners WHERE id = ?").get(id) as { brand_id: string } | undefined;
+  if (!row) throw new Error("Winner not found");
+  await requireBrandAccess(row.brand_id);
   deleteExternalWinner(id);
   revalidatePath("/brands/[slug]/winners", "page");
 }
 
 export async function importCsvAction(brandId: string, brandSlug: string, fd: FormData): Promise<{ added: number }> {
+  await requireBrandAccess(brandId);
   let csv = "";
   const file = fd.get("file") as File | null;
   if (file && file.size) csv = await file.text();

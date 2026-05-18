@@ -8,6 +8,16 @@ export function getClaude(): Anthropic | null {
   if (_client) return _client;
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return null;
+  // Hard-cap check: if ANTHROPIC_BUDGET_USD is set and exceeded, treat as mock.
+  // We require lazily inside this function so the persistence module is available at call time.
+  try {
+    const { withinClaudeBudget } = require("@/lib/ratelimit");
+    const status = withinClaudeBudget();
+    if (!status.allowed) {
+      console.warn(`[claude] budget exceeded ($${status.spentUsd?.toFixed(2)} / $${status.budgetUsd}) — falling back to mock`);
+      return null;
+    }
+  } catch {}
   _client = new Anthropic({ apiKey: key });
   return _client;
 }

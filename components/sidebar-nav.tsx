@@ -31,8 +31,9 @@ export function SidebarNav({
     { href: "/campaigns", label: "Campaigns" },
     { href: "/review", label: "Review queue" },
     { href: "/formats", label: "Format catalog" },
+    { href: "/credits", label: "Credits & plan" },
     { href: "/providers", label: "AI providers" },
-    { href: "/usage", label: "Usage & cost" },
+    { href: "/usage", label: "Token usage (ops)" },
   ];
 
   const launchNav = [

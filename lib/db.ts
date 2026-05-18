@@ -291,6 +291,31 @@ function migrate(d: Database.Database) {
 
   try { d.prepare("ALTER TABLE generations ADD COLUMN is_winner INTEGER NOT NULL DEFAULT 0").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN overrides_json TEXT").run(); } catch {}
+
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS user_credits (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    tier TEXT NOT NULL DEFAULT 'trial',
+    balance INTEGER NOT NULL DEFAULT 0,
+    monthly_grant INTEGER NOT NULL DEFAULT 0,
+    period_start INTEGER NOT NULL,
+    period_end INTEGER NOT NULL,
+    lifetime_used INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS credit_transactions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    description TEXT,
+    ref_kind TEXT,
+    ref_id TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS ct_user_idx ON credit_transactions(user_id);
+  CREATE INDEX IF NOT EXISTS ct_kind_idx ON credit_transactions(kind);
+  `);
 }
 
 export function nowMs() {

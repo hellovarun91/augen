@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/session";
 import { SidebarNav } from "./sidebar-nav";
 import { BrandSwitcher } from "./brand-switcher";
-import { UsageChip } from "./usage-chip";
+import { CreditsChip } from "./credits-chip";
 
 export async function Sidebar() {
   const { user, brands, activeBrand } = await getSession();
@@ -25,7 +25,7 @@ export async function Sidebar() {
 
       {user && (
         <div className="px-4 pb-3">
-          <UsageChip />
+          <CreditsChip userId={user.id} />
         </div>
       )}
     </aside>
