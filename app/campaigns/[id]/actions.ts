@@ -1,19 +1,47 @@
 "use server";
-import { runCampaign } from "@/lib/engine/orchestrator";
+import { generateAdsViaAgents, strategistOnly } from "@/lib/agents/orchestrator";
 import { getBrand, getCampaign } from "@/lib/repo";
 import { db, nowMs } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
-export async function runCampaignAction(campaignId: string) {
+export async function runCampaignAction(campaignId: string, copyConstraint?: string) {
   const c = getCampaign(campaignId);
   if (!c) throw new Error("Campaign missing");
   const b = getBrand(c.brand_id);
   if (!b) throw new Error("Brand missing");
   const variantsPerFormat = c.brief.notes?.match(/variants:(\d+)/)?.[1];
   const v = variantsPerFormat ? parseInt(variantsPerFormat, 10) : 1;
-  runCampaign({ campaignId, brand: b, brief: c.brief, variantsPerFormat: v });
+  const result = await generateAdsViaAgents({
+    campaignId,
+    brand: b,
+    brief: c.brief,
+    variantsPerFormat: v,
+    copyConstraint,
+  });
   revalidatePath(`/campaigns/${campaignId}`);
+  revalidatePath(`/campaigns/${campaignId}/agents`);
   revalidatePath("/review");
+  return result;
+}
+
+export async function runStrategistAction(campaignId: string, opts: { count: number; notes?: string }) {
+  const c = getCampaign(campaignId);
+  if (!c) throw new Error("Campaign missing");
+  const b = getBrand(c.brand_id);
+  if (!b) throw new Error("Brand missing");
+  const result = await strategistOnly({
+    campaignId,
+    brand: b,
+    brief: c.brief,
+    language: b.language,
+    quarter: c.quarter || undefined,
+    year: c.year || undefined,
+    count: opts.count,
+    notes: opts.notes,
+  });
+  revalidatePath(`/campaigns/${campaignId}`);
+  revalidatePath(`/campaigns/${campaignId}/agents`);
+  return result;
 }
 
 export async function saveBriefAction(campaignId: string, patch: {

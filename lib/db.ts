@@ -201,6 +201,32 @@ function migrate(d: Database.Database) {
   );
 
   CREATE INDEX IF NOT EXISTS cv_idea_idx ON copy_variants(idea_id);
+
+  CREATE TABLE IF NOT EXISTS agent_runs (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    chain_id TEXT,
+    parent_run_id TEXT,
+    brand_id TEXT,
+    campaign_id TEXT,
+    idea_id TEXT,
+    generation_id TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    input_json TEXT NOT NULL,
+    output_json TEXT,
+    rationale TEXT,
+    provider TEXT NOT NULL DEFAULT 'mock',
+    model TEXT,
+    duration_ms INTEGER,
+    tokens_in INTEGER,
+    tokens_out INTEGER,
+    error TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS ar_campaign_idx ON agent_runs(campaign_id);
+  CREATE INDEX IF NOT EXISTS ar_chain_idx ON agent_runs(chain_id);
+  CREATE INDEX IF NOT EXISTS ar_kind_idx ON agent_runs(kind);
   `);
 
   // Migrate old generations rows that lack the new ref column

@@ -2,7 +2,7 @@
 import { synthesizeBrand } from "@/lib/ai/brand-builder";
 import { createBrand, createCampaign, createIdea, getBrandBySlug, listBrands } from "@/lib/repo";
 import { planQuarter, plannedToBrief } from "@/lib/ai/planner";
-import { runCampaign } from "@/lib/engine/orchestrator";
+import { generateAdsViaAgents } from "@/lib/agents/orchestrator";
 import { slugify } from "@/lib/utils";
 import { db } from "@/lib/db";
 import { addMembership, createUser, getUserByEmail, pickAvatarColor } from "@/lib/users";
@@ -90,8 +90,8 @@ async function main() {
         }
         // Only run the first campaign per brand to keep the seed quick
         if (p === planned[0]) {
-          const res = runCampaign({ campaignId: campaign.id, brand, brief: plannedToBrief(p), variantsPerFormat: 1 });
-          console.log(`  - ran ${campaign.name}: ${res.generations} ads, ${(res.costCents / 100).toFixed(2)} USD (mock)`);
+          const res = await generateAdsViaAgents({ campaignId: campaign.id, brand, brief: plannedToBrief(p), variantsPerFormat: 1 });
+          console.log(`  - ran ${campaign.name}: ${res.generations} ads via agents (chain ${res.chainId})`);
         }
       }
     } else {
