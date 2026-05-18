@@ -235,6 +235,7 @@ function migrate(d: Database.Database) {
   try { d.prepare("ALTER TABLE generations ADD COLUMN width_override INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN height_override INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE brands ADD COLUMN language TEXT").run(); } catch {}
+  try { d.prepare("ALTER TABLE brands ADD COLUMN figma_file_url TEXT").run(); } catch {}
 }
 
 export function nowMs() {

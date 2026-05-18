@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import JSZip from "jszip";
 import { getBrand, getCampaign, getReference, listGenerationsByCampaign } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
+import { rasterizeSvg, inlineRefImages } from "@/lib/composer/rasterize";
 import { formatBySlug } from "@/lib/formats";
 import { db } from "@/lib/db";
 
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     counts: { total: gens.length, approved: gens.filter((g) => g.status === "approved").length },
   }, null, 2));
 
+  const includePng = new URL(req.url).searchParams.get("png") !== "0";
+
   const manifest = gens.map((g) => {
     const fmt = formatBySlug(g.format_slug);
     return {
@@ -42,28 +45,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       headline: g.headline, subhead: g.subhead, cta: g.cta, eyebrow: g.eyebrow,
       confidence: g.confidence,
       status: g.status,
-      file: `${g.format_slug}/${g.id}.svg`,
+      svg: `${g.format_slug}/${g.id}.svg`,
+      png: includePng ? `${g.format_slug}/${g.id}.png` : undefined,
       platform: fmt?.platform,
       placement: fmt?.placement,
     };
   });
   root.file("manifest.json", JSON.stringify(manifest, null, 2));
 
-  // Per-format folders with SVGs
+  // Per-format folders with SVG (refs inlined as base64) and rasterized PNG
   for (const g of gens) {
     const fmtFolder = root.folder(g.format_slug)!;
     const refRow = db().prepare("SELECT reference_id FROM generations WHERE id = ?").get(g.id) as { reference_id: string | null } | undefined;
     const refObj = refRow?.reference_id ? getReference(refRow.reference_id) : null;
     const refUrl = refObj?.file_path
-      ? new URL(refObj.file_path.startsWith("/") ? refObj.file_path : `/refs/${refObj.file_path.split("/").pop()}`, req.url).toString()
+      ? (refObj.file_path.startsWith("/") ? refObj.file_path : `/refs/${refObj.file_path.split("/").pop()}`)
       : undefined;
-    const svg = renderAdSvg({
+    const rawSvg = renderAdSvg({
       width: g.width, height: g.height, aspect: g.aspect, tokens: b.tokens,
       copy: { eyebrow: g.eyebrow || undefined, headline: g.headline, subhead: g.subhead || "", cta: g.cta },
       seed: g.image_seed, style: g.image_style || b.tokens.imagery.style,
       referenceUrl: refUrl,
     });
-    fmtFolder.file(`${g.id}.svg`, svg);
+    const standaloneSvg = await inlineRefImages(rawSvg);
+    fmtFolder.file(`${g.id}.svg`, standaloneSvg);
+    if (includePng) {
+      try {
+        const png = await rasterizeSvg(rawSvg, { width: Math.min(g.width, 2048), inlineReferences: true });
+        fmtFolder.file(`${g.id}.png`, png);
+      } catch (e: any) {
+        console.warn(`[export] PNG failed for ${g.id}:`, e?.message || e);
+      }
+    }
   }
 
   const README = `# ${b.name} — ${c.name}

@@ -5,7 +5,8 @@ import { runArtDirector } from "./art-director";
 import { runCopywriter } from "./copywriter";
 import { runCritic } from "./critic";
 import { formatBySlug } from "@/lib/formats";
-import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference } from "@/lib/repo";
+import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference, createReference } from "@/lib/repo";
+import { generateImage, saveBytes } from "@/lib/images/providers";
 import type { AgentProvider } from "./types";
 
 const PROVIDER: AgentProvider = { name: "mock", model: "augen-mock@1" };
@@ -142,10 +143,29 @@ export async function generateAdsViaAgents(args: {
           chargeBilling(args.brand.id, COST_PER_AD_CENTS, `Generation · ${fmt.name}`, gen.id);
         }
 
-        // Assign a reference to this generation if any are selected. Deterministic round-robin.
+        // Resolve a reference image for this generation.
+        // Priority: pre-loaded library refs (round-robin) > Gemini fresh generation > SVG fallback.
         if (allRefs.length) {
-          const pick = allRefs[count % allRefs.length];
-          if (pick.file_path) updateGenerationReference(gen.id, pick.id);
+          const pickRef = allRefs[count % allRefs.length];
+          if (pickRef.file_path) updateGenerationReference(gen.id, pickRef.id);
+        } else if (process.env.GEMINI_API_KEY) {
+          const img = await generateImage(art.output.imagePrompt, fmt.aspect);
+          if (img) {
+            const saved = await saveBytes(args.brand.slug, img.bytes, img.mime);
+            const ref = createReference({
+              brandId: args.brand.id,
+              kind: "generated",
+              source: "gemini",
+              label: `Generated · ${idea.theme.slice(0, 40)} · ${fmt.aspect}`,
+              prompt: art.output.imagePrompt,
+              filePath: saved.publicPath,
+              mime: img.mime,
+              width: img.width,
+              height: img.height,
+              tags: [fmt.aspect, "gemini", `seed:${art.output.seed}`],
+            });
+            updateGenerationReference(gen.id, ref.id);
+          }
         }
 
         count++;

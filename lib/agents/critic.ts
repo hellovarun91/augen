@@ -1,7 +1,78 @@
 import type { CriticInput, CriticOutput } from "./types";
 import { formatBySlug } from "@/lib/formats";
+import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
 
 export async function runCritic(input: CriticInput): Promise<{ output: CriticOutput; rationale: string }> {
+  if (getClaude()) {
+    try { return await runCriticClaude(input); }
+    catch (e: any) { console.warn("[critic] Claude failed, falling back to mock:", e?.message || e); }
+  }
+  return runCriticMock(input);
+}
+
+async function runCriticClaude(input: CriticInput): Promise<{ output: CriticOutput; rationale: string }> {
+  const client = getClaude()!;
+  const fmt = formatBySlug(input.formatSlug);
+  const system = [
+    {
+      type: "text" as const,
+      text: `You are a brand QC Critic. Score each ad on three axes (0-1): voiceFit (does it sound like the brand?), formatFit (does headline length and rhythm match this format crop?), conceptStrength (is there a real idea here, or is it generic?). Be strict — most ads should land 0.65-0.85. Return ship/revise/kill plus 3-6 specific notes (wins or issues, each one short). If verdict is revise, write a one-sentence revisionNote with what to ask for.`,
+      cache_control: { type: "ephemeral" as const },
+    },
+    brandSystemBlock(input.brand, input.language),
+  ];
+
+  const userText = [
+    `Format: ${fmt ? `${fmt.name} (${fmt.width}×${fmt.height}, ${fmt.aspect})` : input.formatSlug}`,
+    input.idea ? `Idea theme: ${input.idea.theme}` : "",
+    "",
+    `Eyebrow: ${input.copy.eyebrow}`,
+    `Headline: ${input.copy.headline}`,
+    `Subhead: ${input.copy.subhead}`,
+    `CTA: ${input.copy.cta}`,
+  ].filter(Boolean).join("\n");
+
+  const resp = await client.messages.create({
+    model: claudeModel(),
+    max_tokens: claudeMaxTokens(),
+    system,
+    messages: [{ role: "user", content: userText }],
+    tools: [{
+      name: "emit_critique",
+      description: "Return the critic's verdict on this ad.",
+      input_schema: {
+        type: "object",
+        properties: {
+          score: { type: "number", minimum: 0, maximum: 1 },
+          voiceFit: { type: "number", minimum: 0, maximum: 1 },
+          formatFit: { type: "number", minimum: 0, maximum: 1 },
+          conceptStrength: { type: "number", minimum: 0, maximum: 1 },
+          verdict: { type: "string", enum: ["ship", "revise", "kill"] },
+          notes: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6 },
+          revisionNote: { type: "string" },
+          rationale: { type: "string" },
+        },
+        required: ["score", "voiceFit", "formatFit", "conceptStrength", "verdict", "notes", "rationale"],
+      },
+    }],
+    tool_choice: { type: "tool", name: "emit_critique" },
+  });
+
+  const out = extractToolUse<{
+    score: number; voiceFit: number; formatFit: number; conceptStrength: number;
+    verdict: CriticOutput["verdict"]; notes: string[]; revisionNote?: string; rationale: string;
+  }>(resp, "emit_critique");
+
+  return {
+    output: {
+      score: out.score, voiceFit: out.voiceFit, formatFit: out.formatFit, conceptStrength: out.conceptStrength,
+      verdict: out.verdict, notes: out.notes, revisionNote: out.revisionNote,
+    },
+    rationale: out.rationale,
+  };
+}
+
+async function runCriticMock(input: CriticInput): Promise<{ output: CriticOutput; rationale: string }> {
   const notes: string[] = [];
   const wins: string[] = [];
   const head = (input.copy.headline || "").trim();

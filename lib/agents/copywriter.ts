@@ -1,5 +1,7 @@
 import type { CopyVariant, CopywriterInput, CopywriterOutput } from "./types";
 import { hashStr, pick, pickN, rng } from "@/lib/ai/rand";
+import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
+import { formatBySlug } from "@/lib/formats";
 
 const HEADLINE_TEMPLATES = [
   "{product}.\nMade for the\nway you live.",
@@ -89,6 +91,79 @@ const PROMISES = [
 const FLAVORS = ["citrus", "grapefruit", "yuzu", "lavender", "fig", "smoked salt", "honey", "pear", "amaranth", "rosemary"];
 
 export async function runCopywriter(input: CopywriterInput): Promise<{ output: CopywriterOutput; rationale: string }> {
+  if (getClaude()) {
+    try { return await runCopywriterClaude(input); }
+    catch (e: any) { console.warn("[copywriter] Claude failed, falling back to mock:", e?.message || e); }
+  }
+  return runCopywriterMock(input);
+}
+
+async function runCopywriterClaude(input: CopywriterInput): Promise<{ output: CopywriterOutput; rationale: string }> {
+  const client = getClaude()!;
+  const fmt = formatBySlug(input.formatSlug);
+  const ratio = fmt ? fmt.width / fmt.height : 1;
+  const headlineMax = ratio >= 3 ? 28 : ratio >= 1.5 ? 42 : 60;
+
+  const system = [
+    {
+      type: "text" as const,
+      text: `You are a brand copywriter. Write ad copy in the brand's voice. Each variant has: eyebrow (2-3 words, ALL CAPS allowed only here), headline (use \\n linebreaks for stacking on portrait/square), subhead (one sentence, under ~100 chars), CTA (verb-led, ≤4 words). Honor banned words strictly. Respect operator constraints. Never use exclamation marks unless the tone profile leans playful.`,
+      cache_control: { type: "ephemeral" as const },
+    },
+    brandSystemBlock(input.brand, input.language),
+  ];
+
+  const userText = [
+    `Idea theme: ${input.idea.theme}`,
+    (input.idea as any).insight ? `Insight: ${(input.idea as any).insight}` : "",
+    `Angle: ${input.idea.angle}`,
+    `Audience: ${input.idea.audience}`,
+    input.product ? `Product focus: ${input.product}` : "",
+    `Format: ${fmt ? `${fmt.name} (${fmt.width}×${fmt.height}, ${fmt.aspect})` : input.formatSlug}`,
+    `Headline char budget (max): ${headlineMax}`,
+    input.constraints ? `Operator constraint: ${input.constraints}` : "",
+    input.carryForward?.length ? `Do NOT repeat these prior headlines:\n${input.carryForward.slice(0, 12).map((h) => `- ${h.replace(/\n/g, " ")}`).join("\n")}` : "",
+    "",
+    `Draft ${input.count} variants. Each must be voice-correct and feel like it could appear at this format size.`,
+  ].filter(Boolean).join("\n");
+
+  const resp = await client.messages.create({
+    model: claudeModel(),
+    max_tokens: claudeMaxTokens(),
+    system,
+    messages: [{ role: "user", content: userText }],
+    tools: [{
+      name: "emit_variants",
+      description: "Return copy variants for this ad.",
+      input_schema: {
+        type: "object",
+        properties: {
+          rationale: { type: "string" },
+          variants: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                eyebrow: { type: "string" },
+                headline: { type: "string" },
+                subhead: { type: "string" },
+                cta: { type: "string" },
+              },
+              required: ["eyebrow", "headline", "subhead", "cta"],
+            },
+          },
+        },
+        required: ["rationale", "variants"],
+      },
+    }],
+    tool_choice: { type: "tool", name: "emit_variants" },
+  });
+
+  const out = extractToolUse<{ rationale: string; variants: CopyVariant[] }>(resp, "emit_variants");
+  return { output: { rationale: out.rationale, variants: out.variants }, rationale: out.rationale };
+}
+
+async function runCopywriterMock(input: CopywriterInput): Promise<{ output: CopywriterOutput; rationale: string }> {
   const seedKey = `${input.brand.slug}|${input.idea.theme}|${input.product || ""}|${input.formatSlug}|v${input.variantIndex}|${input.constraints || ""}|${(input.carryForward || []).length}`;
   const seed = hashStr(seedKey);
   const r = rng(seed);

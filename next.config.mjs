@@ -4,7 +4,7 @@ const nextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "8mb" },
   },
-  serverExternalPackages: ["better-sqlite3"],
+  serverExternalPackages: ["better-sqlite3", "@resvg/resvg-js"],
   images: {
     remotePatterns: [],
   },

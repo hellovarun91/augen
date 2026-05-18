@@ -50,6 +50,16 @@ export function updateBrandLanguage(id: string, language: BrandLanguage): Brand 
   return getBrand(id)!;
 }
 
+export function updateBrandFigmaUrl(id: string, figmaUrl: string | null): Brand {
+  db().prepare("UPDATE brands SET figma_file_url = ?, updated_at = ? WHERE id = ?").run(figmaUrl, nowMs(), id);
+  return getBrand(id)!;
+}
+
+export function getBrandFigmaUrl(id: string): string | null {
+  const r = db().prepare("SELECT figma_file_url FROM brands WHERE id = ?").get(id) as { figma_file_url: string | null } | undefined;
+  return r?.figma_file_url || null;
+}
+
 export interface NewBrand {
   name: string;
   slug: string;

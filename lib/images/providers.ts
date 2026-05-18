@@ -79,30 +79,55 @@ export interface GeneratedResult {
 export async function generateImage(prompt: string, aspectHint: string): Promise<GeneratedResult | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  // NOTE: This is a seam — exact endpoint shape depends on Gemini Nano Banana 2 release.
-  // We attempt the documented imagegen endpoint; failures return null so callers fall back to SVG.
+  const model = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+  const fullPrompt = `${prompt}\n\nAspect ratio: ${aspectHint}. Photographic, real subject, single image, no text, no logos, no watermark.`;
+
   try {
     const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt + ` Aspect: ${aspectHint}. Photographic, real subject, no text.` }] }],
+          contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+          generationConfig: { responseModalities: ["IMAGE"] },
         }),
       },
     );
-    if (!r.ok) return null;
+    if (!r.ok) {
+      const body = await r.text();
+      console.warn(`[gemini] ${r.status} ${r.statusText}: ${body.slice(0, 200)}`);
+      return null;
+    }
     const j: any = await r.json();
     const part = j?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
-    if (!part) return null;
+    if (!part) {
+      console.warn("[gemini] response had no inlineData");
+      return null;
+    }
     const mime = part.inlineData.mimeType || "image/png";
     const bytes = Buffer.from(part.inlineData.data, "base64");
     const [aw, ah] = parseAspect(aspectHint);
     return { bytes, mime, source: "gemini", prompt, width: aw, height: ah };
-  } catch {
+  } catch (e: any) {
+    console.warn("[gemini] threw:", e?.message || e);
     return null;
   }
+}
+
+export function geminiStatus(): { enabled: boolean; model: string; reason?: string } {
+  if (!process.env.GEMINI_API_KEY) return { enabled: false, model: process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview", reason: "GEMINI_API_KEY not set" };
+  return { enabled: true, model: process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview" };
+}
+
+export function pexelsStatus(): { enabled: boolean; reason?: string } {
+  if (!process.env.PEXELS_API_KEY) return { enabled: false, reason: "PEXELS_API_KEY not set" };
+  return { enabled: true };
+}
+
+export function figmaStatus(): { enabled: boolean; reason?: string } {
+  if (!process.env.FIGMA_PERSONAL_ACCESS_TOKEN) return { enabled: false, reason: "FIGMA_PERSONAL_ACCESS_TOKEN not set" };
+  return { enabled: true };
 }
 
 export async function saveBytes(brandSlug: string, bytes: Buffer, mime: string): Promise<SaveResult> {

@@ -18,6 +18,8 @@ export function SidebarNav({
         { href: `/brands/${activeBrand.slug}`, label: "Overview", group: "brand" },
         { href: `/brands/${activeBrand.slug}/language`, label: "Language", group: "brand" },
         { href: `/brands/${activeBrand.slug}/tokens`, label: "Design tokens", group: "brand" },
+        { href: `/brands/${activeBrand.slug}/tokens/extract`, label: "Extract from artwork", group: "brand" },
+        { href: `/brands/${activeBrand.slug}/figma`, label: "Figma sync", group: "brand" },
         { href: `/brands/${activeBrand.slug}/references`, label: "References", group: "brand" },
         { href: `/brands/${activeBrand.slug}/plan`, label: "Quarterly plan", group: "brand" },
       ]
@@ -28,6 +30,7 @@ export function SidebarNav({
     { href: "/campaigns", label: "Campaigns" },
     { href: "/review", label: "Review queue" },
     { href: "/formats", label: "Format catalog" },
+    { href: "/providers", label: "AI providers" },
   ];
 
   const launchNav = [

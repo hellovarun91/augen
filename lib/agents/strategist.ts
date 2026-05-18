@@ -1,5 +1,6 @@
 import type { StrategistInput, StrategistOutput } from "./types";
 import { hashStr, pick, pickN, rng } from "@/lib/ai/rand";
+import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
 
 // Re-uses the planner's idea taxonomy but produces output as if a strategist agent reasoned about it.
 // The rationale field is the visible "thinking" trace the operator sees in the chain UI.
@@ -27,6 +28,77 @@ const VISUAL_DIRECTIONS = [
 ];
 
 export async function runStrategist(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string }> {
+  if (getClaude()) {
+    try {
+      return await runStrategistClaude(input);
+    } catch (e: any) {
+      console.warn("[strategist] Claude failed, falling back to mock:", e?.message || e);
+    }
+  }
+  return runStrategistMock(input);
+}
+
+async function runStrategistClaude(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string }> {
+  const client = getClaude()!;
+  const system = [
+    {
+      type: "text" as const,
+      text: `You are a brand strategist working in an editorial register. You write fewer, stronger ideas, never marketing puffery. Each idea must name a single insight, a specific audience, a promise (what the work will do for the audience), an angle, and a visual direction.\n\nReturn ideas via the emit_ideas tool. Each idea's "theme" should be evocative (2-5 words, capitalize sparingly). Hooks should be ad-ready lines you'd actually use — not category clichés.`,
+      cache_control: { type: "ephemeral" as const },
+    },
+    brandSystemBlock(input.brand, input.language),
+  ];
+  const userText = [
+    `Quarter: ${input.quarter || "this period"}${input.year ? " " + input.year : ""}`,
+    `Objective: ${input.brief.objective}`,
+    `Audience: ${input.brief.audience}`,
+    input.brief.productFocus.length ? `Product focus: ${input.brief.productFocus.join(", ")}` : null,
+    input.brief.notes ? `Brief notes: ${input.brief.notes}` : null,
+    input.notes ? `Operator steer: ${input.notes}` : null,
+    "",
+    `Draft ${input.count} ideas. Each one should be reachable by a different angle (no two same angle).`,
+  ].filter(Boolean).join("\n");
+
+  const resp = await client.messages.create({
+    model: claudeModel(),
+    max_tokens: claudeMaxTokens(),
+    system,
+    messages: [{ role: "user", content: userText }],
+    tools: [{
+      name: "emit_ideas",
+      description: "Return the strategist's ideas for this campaign.",
+      input_schema: {
+        type: "object",
+        properties: {
+          rationale: { type: "string", description: "One-paragraph strategist note. What you reached for and why. Plain, not hyped." },
+          ideas: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                theme: { type: "string" },
+                insight: { type: "string", description: "One sentence. The real thing the audience is feeling." },
+                angle: { type: "string" },
+                audience: { type: "string" },
+                promise: { type: "string" },
+                hooks: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
+                visualDirection: { type: "string" },
+              },
+              required: ["theme", "insight", "angle", "audience", "promise", "hooks", "visualDirection"],
+            },
+          },
+        },
+        required: ["rationale", "ideas"],
+      },
+    }],
+    tool_choice: { type: "tool", name: "emit_ideas" },
+  });
+
+  const out = extractToolUse<{ rationale: string; ideas: StrategistOutput["ideas"] }>(resp, "emit_ideas");
+  return { output: { rationale: out.rationale, ideas: out.ideas }, rationale: out.rationale };
+}
+
+async function runStrategistMock(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string }> {
   const seedKey = `${input.brand.slug}|${input.quarter || ""}|${input.year || ""}|${input.brief.objective}|${input.notes || ""}`;
   const seed = hashStr(seedKey);
   const r = rng(seed);

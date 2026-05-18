@@ -1,5 +1,6 @@
 import type { ArtDirectorInput, ArtDirectorOutput } from "./types";
 import { hashStr, pick, rng } from "@/lib/ai/rand";
+import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
 
 const COMPOSITIONS = [
   "Rule-of-thirds, subject upper-left, generous negative space lower-right.",
@@ -35,6 +36,69 @@ const SUBJECTS_BY_INDUSTRY: Record<string, string[]> = {
 };
 
 export async function runArtDirector(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string }> {
+  if (getClaude()) {
+    try { return await runArtDirectorClaude(input); }
+    catch (e: any) { console.warn("[art_director] Claude failed, falling back to mock:", e?.message || e); }
+  }
+  return runArtDirectorMock(input);
+}
+
+async function runArtDirectorClaude(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string }> {
+  const client = getClaude()!;
+  const lang = (input.brand as any).language;
+  const system = [
+    {
+      type: "text" as const,
+      text: `You are a brand Art Director. You direct a photographic image generator. Pick composition, lighting, subject, and palette emphasis that feel native to this brand. The output is a single image prompt the generator will follow literally — write it as crisp, specific direction. No marketing language. Avoid logos and text in the image.`,
+      cache_control: { type: "ephemeral" as const },
+    },
+    brandSystemBlock(input.brand, lang || (input.brand as any).tokens.voice),
+  ];
+
+  const userText = [
+    `Idea theme: ${input.idea.theme}`,
+    `Angle: ${input.idea.angle}`,
+    (input.idea as any).insight ? `Insight: ${(input.idea as any).insight}` : "",
+    input.product ? `Product focus: ${input.product}` : "",
+    `Format: ${input.formatSlug} (aspect ${input.aspect})`,
+    input.referencePool?.length ? `Brand reference pool: ${input.referencePool.slice(0, 8).join("; ")}. Condition for subject consistency.` : "No brand references uploaded yet — invent from the brand's imagery treatment.",
+    input.notes ? `Operator notes: ${input.notes}` : "",
+    "",
+    "Direct one shot. Emit subject, composition, lighting, style keyword, palette emphasis (3-6 hex codes), and the full image prompt.",
+  ].filter(Boolean).join("\n");
+
+  const resp = await client.messages.create({
+    model: claudeModel(),
+    max_tokens: claudeMaxTokens(),
+    system,
+    messages: [{ role: "user", content: userText }],
+    tools: [{
+      name: "emit_direction",
+      description: "Return art direction for this ad's image.",
+      input_schema: {
+        type: "object",
+        properties: {
+          rationale: { type: "string" },
+          subject: { type: "string" },
+          composition: { type: "string" },
+          lighting: { type: "string" },
+          styleKeyword: { type: "string" },
+          paletteEmphasis: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
+          imagePrompt: { type: "string", description: "The full prompt sent to the image generator. Include subject, composition, lighting, aspect ratio." },
+          refSuggestion: { type: "string" },
+        },
+        required: ["rationale", "subject", "composition", "lighting", "styleKeyword", "paletteEmphasis", "imagePrompt"],
+      },
+    }],
+    tool_choice: { type: "tool", name: "emit_direction" },
+  });
+
+  const out = extractToolUse<Omit<ArtDirectorOutput, "seed">>(resp, "emit_direction");
+  const seed = hashStr(`${input.brand.slug}|${input.idea.theme}|${input.formatSlug}|${input.variantIndex}`);
+  return { output: { ...out, seed }, rationale: out.rationale };
+}
+
+async function runArtDirectorMock(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string }> {
   const seedBase = `${input.brand.slug}|${input.idea.theme}|${input.product || ""}|${input.formatSlug}|v${input.variantIndex}|${input.notes || ""}`;
   const seed = hashStr(seedBase);
   const r = rng(seed);
