@@ -290,6 +290,7 @@ function migrate(d: Database.Database) {
   `);
 
   try { d.prepare("ALTER TABLE generations ADD COLUMN is_winner INTEGER NOT NULL DEFAULT 0").run(); } catch {}
+  try { d.prepare("ALTER TABLE generations ADD COLUMN overrides_json TEXT").run(); } catch {}
 }
 
 export function nowMs() {

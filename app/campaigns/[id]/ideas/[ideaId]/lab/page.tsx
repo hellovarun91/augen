@@ -46,7 +46,7 @@ export default async function CopyLabPage({ params }: { params: Promise<{ id: st
         {variants.length === 0 ? (
           <Empty title="No variants yet">Press Spin variants above to draft a first batch.</Empty>
         ) : (
-          <VariantList variants={variants} brandId={brand.id} />
+          <VariantList variants={variants} brandId={brand.id} limits={brand.language.copyLimits} />
         )}
       </Section>
     </div>

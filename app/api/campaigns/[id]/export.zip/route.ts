@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import JSZip from "jszip";
-import { getBrand, getCampaign, getReference, listGenerationsByCampaign } from "@/lib/repo";
+import { getBrand, getCampaign, getGenerationOverrides, getReference, listGenerationsByCampaign } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
 import { rasterizeSvg, inlineRefImages } from "@/lib/composer/rasterize";
 import { formatBySlug } from "@/lib/formats";
 import { db } from "@/lib/db";
+import { parseOverrides } from "@/lib/composer/overrides";
 
 export const dynamic = "force-dynamic";
 
@@ -61,11 +62,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const refUrl = refObj?.file_path
       ? (refObj.file_path.startsWith("/") ? refObj.file_path : `/refs/${refObj.file_path.split("/").pop()}`)
       : undefined;
+    const overrides = parseOverrides(getGenerationOverrides(g.id));
+    const effectiveRefUrl = overrides.image.replaceUrl
+      ? (overrides.image.replaceUrl.startsWith("/") ? overrides.image.replaceUrl : `/refs/${overrides.image.replaceUrl}`)
+      : refUrl;
     const rawSvg = renderAdSvg({
       width: g.width, height: g.height, aspect: g.aspect, tokens: b.tokens,
       copy: { eyebrow: g.eyebrow || undefined, headline: g.headline, subhead: g.subhead || "", cta: g.cta },
       seed: g.image_seed, style: g.image_style || b.tokens.imagery.style,
-      referenceUrl: refUrl,
+      referenceUrl: effectiveRefUrl,
+      overrides,
     });
     const standaloneSvg = await inlineRefImages(rawSvg);
     fmtFolder.file(`${g.id}.svg`, standaloneSvg);

@@ -86,12 +86,20 @@ export function LabControls({
   );
 }
 
-export function VariantList({ variants, brandId }: { variants: VariantRow[]; brandId: string }) {
+export function VariantList({ variants, brandId, limits }: { variants: VariantRow[]; brandId: string; limits?: { headlineMaxChars: number; subheadMaxChars: number; ctaMaxChars: number; eyebrowMaxChars: number } }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [_, start] = useTransition();
+  const lim = limits || { headlineMaxChars: 48, subheadMaxChars: 120, ctaMaxChars: 24, eyebrowMaxChars: 18 };
+  function counterClass(n: number, max: number): string {
+    return n > max ? "text-rose-300" : n > max * 0.9 ? "text-amber-200" : "text-ink-400";
+  }
   return (
     <div className="grid md:grid-cols-2 gap-4">
-      {variants.map((v) => (
+      {variants.map((v) => {
+        const hLen = v.headline.replace(/\s+/g, " ").trim().length;
+        const sLen = (v.subhead || "").length;
+        const cLen = (v.cta || "").length;
+        return (
         <Card key={v.id} className="p-5 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div className="serif text-xl tracking-tight whitespace-pre-line flex-1">{v.headline}</div>
@@ -113,7 +121,11 @@ export function VariantList({ variants, brandId }: { variants: VariantRow[]; bra
           {v.subhead && <div className="text-sm text-ink-300">{v.subhead}</div>}
           <div className="flex items-center justify-between text-xs">
             <Badge>{v.source}</Badge>
-            <span className="text-ink-400">{v.cta || "—"}</span>
+            <div className="flex items-center gap-3 text-[11px]">
+              <span className={counterClass(hLen, lim.headlineMaxChars)}>H {hLen}/{lim.headlineMaxChars}</span>
+              {v.subhead && <span className={counterClass(sLen, lim.subheadMaxChars)}>S {sLen}/{lim.subheadMaxChars}</span>}
+              <span className={counterClass(cLen, lim.ctaMaxChars)}>{v.cta || "—"} ({cLen}/{lim.ctaMaxChars})</span>
+            </div>
           </div>
           {v.note && <div className="text-[11px] text-ink-500 italic">{v.note}</div>}
           <details className="pt-1">
@@ -132,7 +144,8 @@ export function VariantList({ variants, brandId }: { variants: VariantRow[]; bra
             </div>
           </details>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }

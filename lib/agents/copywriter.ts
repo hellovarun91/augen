@@ -103,7 +103,10 @@ async function runCopywriterClaude(input: CopywriterInput): Promise<{ output: Co
   const client = getClaude()!;
   const fmt = formatBySlug(input.formatSlug);
   const ratio = fmt ? fmt.width / fmt.height : 1;
-  const headlineMax = ratio >= 3 ? 28 : ratio >= 1.5 ? 42 : 60;
+  const limits = input.language.copyLimits || { headlineMaxChars: 48, subheadMaxChars: 120, ctaMaxChars: 24, eyebrowMaxChars: 18 };
+  // Tighter of: brand-level cap, or format-ergonomics cap.
+  const formatCap = ratio >= 3 ? 28 : ratio >= 1.5 ? 42 : 60;
+  const headlineMax = Math.min(limits.headlineMaxChars, formatCap);
 
   const system = [
     {
@@ -121,11 +124,15 @@ async function runCopywriterClaude(input: CopywriterInput): Promise<{ output: Co
     `Audience: ${input.idea.audience}`,
     input.product ? `Product focus: ${input.product}` : "",
     `Format: ${fmt ? `${fmt.name} (${fmt.width}×${fmt.height}, ${fmt.aspect})` : input.formatSlug}`,
-    `Headline char budget (max): ${headlineMax}`,
+    `Character limits (hard):`,
+    `  headline ≤ ${headlineMax}`,
+    `  subhead ≤ ${limits.subheadMaxChars}`,
+    `  cta ≤ ${limits.ctaMaxChars}`,
+    `  eyebrow ≤ ${limits.eyebrowMaxChars}`,
     input.constraints ? `Operator constraint: ${input.constraints}` : "",
     input.carryForward?.length ? `Do NOT repeat these prior headlines:\n${input.carryForward.slice(0, 12).map((h) => `- ${h.replace(/\n/g, " ")}`).join("\n")}` : "",
     "",
-    `Draft ${input.count} variants. Each must be voice-correct and feel like it could appear at this format size.`,
+    `Draft ${input.count} variants. Each must be voice-correct, honor every character limit, and feel like it could appear at this format size.`,
   ].filter(Boolean).join("\n");
 
   const resp = await client.messages.create({

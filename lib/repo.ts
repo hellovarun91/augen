@@ -282,6 +282,20 @@ export function updateGenerationReference(generationId: string, referenceId: str
   db().prepare("UPDATE generations SET reference_id = ?, updated_at = ? WHERE id = ?").run(referenceId, nowMs(), generationId);
 }
 
+export function getGenerationOverrides(generationId: string): unknown {
+  const row = db().prepare("SELECT overrides_json FROM generations WHERE id = ?").get(generationId) as { overrides_json: string | null } | undefined;
+  if (!row?.overrides_json) return null;
+  try { return JSON.parse(row.overrides_json); } catch { return null; }
+}
+
+export function updateGenerationOverrides(generationId: string, overrides: unknown) {
+  db().prepare("UPDATE generations SET overrides_json = ?, updated_at = ? WHERE id = ?").run(
+    overrides == null ? null : JSON.stringify(overrides),
+    nowMs(),
+    generationId,
+  );
+}
+
 export function updateGenerationCopy(id: string, copy: { headline: string; subhead: string; cta: string; eyebrow?: string }) {
   db().prepare(`UPDATE generations SET headline = ?, subhead = ?, cta = ?, eyebrow = ?, updated_at = ? WHERE id = ?`).run(
     copy.headline, copy.subhead, copy.cta, copy.eyebrow || null, nowMs(), id,

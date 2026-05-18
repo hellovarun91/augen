@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
-import { getBrand, getGeneration, getReference } from "@/lib/repo";
+import { getBrand, getGeneration, getGenerationOverrides, getReference } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
 import { db } from "@/lib/db";
+import { parseOverrides } from "@/lib/composer/overrides";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     ? (refObj.file_path.startsWith("/") ? refObj.file_path : `/refs/${refObj.file_path.split("/").pop()}`)
     : undefined;
 
+  const overrides = parseOverrides(getGenerationOverrides(id));
+
+  // Custom uploaded image overrides the reference round-robin
+  let effectiveRefUrl = referenceUrl;
+  if (overrides.image.replaceUrl) {
+    effectiveRefUrl = overrides.image.replaceUrl.startsWith("/")
+      ? overrides.image.replaceUrl
+      : `/refs/${overrides.image.replaceUrl}`;
+  }
+
   const svg = renderAdSvg({
     width: gen.width,
     height: gen.height,
@@ -40,13 +51,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     showLocker,
     showScrim,
     bareBackground: bare,
-    referenceUrl: referenceUrl ? new URL(referenceUrl, req.url).toString() : undefined,
+    referenceUrl: effectiveRefUrl ? new URL(effectiveRefUrl, req.url).toString() : undefined,
+    overrides,
   });
 
   return new Response(svg, {
     headers: {
       "Content-Type": "image/svg+xml; charset=utf-8",
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=600",
+      "Cache-Control": "no-cache",
     },
   });
 }

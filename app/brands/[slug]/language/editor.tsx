@@ -154,6 +154,27 @@ export function LanguageEditor({ brand }: { brand: Brand }) {
         </Card>
 
         <Card className="p-6 space-y-3">
+          <Eyebrow>Character limits</Eyebrow>
+          <div className="text-xs text-ink-400">Hard caps the Copywriter agent honors. Surfaces as live counters in Copy Lab and the edit panel.</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+            {(["headlineMaxChars", "subheadMaxChars", "ctaMaxChars", "eyebrowMaxChars"] as const).map((k) => (
+              <div key={k} className="space-y-1">
+                <Label>{k.replace("MaxChars", "")} max</Label>
+                <Input
+                  type="number"
+                  value={lang.copyLimits[k]}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value || "0", 10);
+                    setLang({ ...lang, copyLimits: { ...lang.copyLimits, [k]: isNaN(v) ? lang.copyLimits[k] : v } });
+                  }}
+                  className="text-sm"
+                />
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="p-6 space-y-3">
           <Eyebrow>Sample sentences</Eyebrow>
           <div className="text-xs text-ink-400">Lines that sound right. The preview pulls the first two — also pinned for the QC Critic's reference.</div>
           <Listy

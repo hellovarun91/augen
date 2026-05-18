@@ -3,16 +3,22 @@ import { z } from "zod";
 export const BrandLanguage = z.object({
   voiceDescription: z.string().default(""),
   toneSliders: z.object({
-    formal_casual: z.number().default(0),       // -1 formal, +1 casual
-    serious_playful: z.number().default(0),     // -1 serious, +1 playful
-    reserved_bold: z.number().default(0),       // -1 reserved, +1 bold
-    classic_modern: z.number().default(0),      // -1 classic, +1 modern
+    formal_casual: z.number().default(0),
+    serious_playful: z.number().default(0),
+    reserved_bold: z.number().default(0),
+    classic_modern: z.number().default(0),
   }).default({ formal_casual: 0, serious_playful: 0, reserved_bold: 0, classic_modern: 0 }),
   preferredWords: z.array(z.string()).default([]),
   bannedWords: z.array(z.string()).default([]),
   sampleSentences: z.array(z.string()).default([]),
   doRules: z.array(z.string()).default([]),
   doNotRules: z.array(z.string()).default([]),
+  copyLimits: z.object({
+    headlineMaxChars: z.number().int().min(8).max(200).default(48),
+    subheadMaxChars: z.number().int().min(20).max(400).default(120),
+    ctaMaxChars: z.number().int().min(4).max(40).default(24),
+    eyebrowMaxChars: z.number().int().min(2).max(40).default(18),
+  }).default({ headlineMaxChars: 48, subheadMaxChars: 120, ctaMaxChars: 24, eyebrowMaxChars: 18 }),
 });
 export type BrandLanguage = z.infer<typeof BrandLanguage>;
 
