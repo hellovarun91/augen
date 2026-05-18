@@ -10,7 +10,7 @@ export default async function TokensPage({ params }: { params: Promise<{ slug: s
   const brand = getBrandBySlug(slug);
   if (!brand) notFound();
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-10">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-10">
       <div className="flex items-start justify-between gap-6">
         <div>
           <Eyebrow>{brand.name} · token system v{brand.tokens.semver}</Eyebrow>

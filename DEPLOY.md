@@ -2,13 +2,67 @@
 
 Recommended path: **Railway** for closed-beta. SQLite on a persistent volume + Next.js. Migrate to GCP / Cloud Run + Cloud SQL when you outgrow it.
 
-## Railway — 30 minutes start-to-live
+## Option A — Railway via web UI (15 min)
 
 ### 1. Create the project
 
 1. Sign in at https://railway.app.
 2. **New Project → Deploy from GitHub repo → `hellovarun91/augen`**.
 3. Railway detects Next.js and runs `npm install && npm run build`.
+
+## Option B — Railway via CLI (10 min if comfortable in terminal)
+
+```bash
+# Install
+brew install railway        # macOS — or: npm i -g @railway/cli
+
+# Sign in
+railway login               # opens browser
+# or for headless / SSH sessions:
+railway login --browserless # prints a URL + pastes a token
+
+# Verify
+railway whoami
+
+# In the repo root:
+cd /Users/vsaini/Desktop/augen
+
+# Link to an existing project (or create one)
+railway init                # creates a new project, asks for a name
+# or: railway link          # if the project already exists in your dashboard
+
+# Set environment variables (see "Set environment variables" below)
+railway variables set ANTHROPIC_API_KEY=sk-ant-...
+railway variables set GEMINI_API_KEY=...
+railway variables set AUGEN_ALLOWED_EMAILS="alice@x.com,bob@y.com"
+# ...or in bulk from your .env.local:
+railway variables --from-file .env.local
+
+# Add the two volumes (one-time, via dashboard or CLI):
+#   /app/data        (1 GB, for the SQLite file)
+#   /app/public/refs (5 GB, for uploaded images)
+# CLI flag in newer railway-cli versions:
+#   railway volumes create --mount-path /app/data 1
+#   railway volumes create --mount-path /app/public/refs 5
+# If your CLI version doesn't have `volumes`, add them via the dashboard:
+#   Service → Settings → Volumes → New Volume
+
+# Deploy
+railway up                  # streams logs while building
+# or: railway up --detach   # fire-and-forget
+
+# Generate a public domain
+railway domain              # prints a https://*.up.railway.app URL
+
+# Stream logs from the deployed service
+railway logs
+
+# Open a one-off shell on the deployed container
+railway shell
+
+# Run the seed inside the deployed container (creates 3 demo brands)
+railway run npm run seed
+```
 
 ### 2. Add a persistent volume
 

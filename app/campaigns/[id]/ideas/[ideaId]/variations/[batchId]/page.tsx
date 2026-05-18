@@ -27,7 +27,7 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
   const rejectedCount = gens.filter((g) => g.status === "rejected").length;
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-8">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-8">
       <div>
         <Link href={`/campaigns/${campaign.id}/ideas/${idea.id}/variations`} className="text-xs text-ink-400 hover:text-ink-100">← Variations</Link>
         <div className="mt-2 flex items-end justify-between gap-6">

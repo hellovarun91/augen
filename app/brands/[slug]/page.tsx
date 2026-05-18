@@ -18,7 +18,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
   const previewFormats = ["meta-feed-1x1", "meta-feed-4x5", "meta-story-9x16", "google-display-300x600"];
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
       <header
         className="rounded-2xl p-8 ring-1 ring-white/10"
         style={{ background: `linear-gradient(135deg, ${brand.tokens.palette.primary}, ${brand.tokens.palette.accent})` }}
@@ -47,7 +47,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
         </div>
       </header>
 
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="p-5"><Stat label="Campaigns" value={campaigns.length} /></Card>
         <Card className="p-5"><Stat label="Voice" value={<span className="serif text-2xl">{brand.tokens.voice.tone.slice(0, 2).join(", ")}</span>} /></Card>
         <Card className="p-5"><Stat label="Imagery" value={<span className="serif text-2xl capitalize">{brand.tokens.imagery.style}</span>} /></Card>
@@ -55,7 +55,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
       </div>
 
       <Section title="Sample creative" subtitle="Drafted with placeholder copy — to test the token system across the format catalog.">
-        <div className="grid md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {previewFormats.map((fs) => {
             const f = formatBySlug(fs)!;
             return (

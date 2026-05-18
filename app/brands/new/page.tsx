@@ -24,7 +24,7 @@ const PRESETS = [
 
 export default function NewBrandPage() {
   return (
-    <div className="px-8 py-10 max-w-5xl mx-auto space-y-10">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-5xl mx-auto space-y-10">
       <div>
         <Eyebrow>Onboard a brand</Eyebrow>
         <h1 className="serif text-display-lg mt-2 tracking-tight">A brief. We do the rest.</h1>

@@ -15,8 +15,8 @@ export default async function CreditsPage() {
   const txns = listCreditTxns(user.id, 30);
 
   return (
-    <div className="px-8 py-10 max-w-5xl mx-auto space-y-10">
-      <div className="flex items-end justify-between gap-6">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-5xl mx-auto space-y-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
           <Eyebrow>Your credits · {tier.label}</Eyebrow>
           <h1 className="serif text-display-lg mt-1 tracking-tight">{row.balance.toLocaleString()} credits left.</h1>
@@ -34,7 +34,7 @@ export default async function CreditsPage() {
       </div>
 
       <Section title="Tiers" subtitle="Pick a plan. Mock billing — no real charge.">
-        <div className="grid md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {(Object.keys(TIERS) as Tier[]).map((t) => {
             const def = TIERS[t];
             const active = t === row.tier;

@@ -33,7 +33,7 @@ export default async function Dashboard() {
   const approved = gens.filter((g) => g.status === "approved");
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
       <div className="flex items-start justify-between gap-8">
         <div className="max-w-2xl">
           <Eyebrow>{activeBrand.name} · studio</Eyebrow>

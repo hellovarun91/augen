@@ -12,7 +12,7 @@ export default async function ReviewPage() {
   if (!user) redirect("/signin");
   if (!activeBrand) {
     return (
-      <div className="px-8 py-10 max-w-7xl mx-auto">
+      <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto">
         <Empty title="No active brand">Onboard a brand or switch to one in the sidebar.</Empty>
       </div>
     );
@@ -26,7 +26,7 @@ export default async function ReviewPage() {
   const rejected = all.filter((g) => g.status === "rejected").slice(0, 12);
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
       <div>
         <Eyebrow>{activeBrand.name} · review queue</Eyebrow>
         <h1 className="serif text-display-lg mt-1 tracking-tight">Review</h1>

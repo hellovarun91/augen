@@ -14,8 +14,8 @@ export default async function FigmaPage({ params }: { params: Promise<{ slug: st
   const status = figmaStatus();
 
   return (
-    <div className="px-8 py-10 max-w-5xl mx-auto space-y-10">
-      <div className="flex items-end justify-between gap-6">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-5xl mx-auto space-y-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
           <Eyebrow>{brand.name} · Figma sync</Eyebrow>
           <h1 className="serif text-display-lg mt-1 tracking-tight">Round-trip between Figma and the engine.</h1>

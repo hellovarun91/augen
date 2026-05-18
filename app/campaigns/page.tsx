@@ -10,7 +10,7 @@ export default async function CampaignsPage() {
   const { activeBrand } = await getSession();
   if (!activeBrand) {
     return (
-      <div className="px-8 py-10 max-w-7xl mx-auto">
+      <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto">
         <Empty title="No active brand">Onboard a brand or switch to one in the sidebar.</Empty>
       </div>
     );
@@ -18,7 +18,7 @@ export default async function CampaignsPage() {
   const campaigns = listCampaignsByBrand(activeBrand.id);
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-10">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-10">
       <Section
         title={`${activeBrand.name} · campaigns`}
         subtitle="Each campaign is a brief, a set of ideas, and the ads they produced. Money is not on this page — it lives under Launch."

@@ -47,7 +47,7 @@ export default async function AgentChainPage({ params }: { params: Promise<{ id:
   };
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
       <div>
         <Link href={`/campaigns/${c.id}`} className="text-xs text-ink-400 hover:text-ink-100">← {c.name}</Link>
         <div className="flex items-end justify-between gap-6 mt-2">
@@ -62,7 +62,7 @@ export default async function AgentChainPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {(["strategist", "art_director", "copywriter", "critic"] as const).map((k) => (
           <Card key={k} className="p-5">
             <Eyebrow>{AGENT_META[k].name}</Eyebrow>

@@ -30,8 +30,8 @@ async function UsageContent(spPromise?: Promise<Record<string, string>>) {
   const realRows = breakdown.filter((r) => r.provider !== "mock");
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
-      <div className="flex items-end justify-between gap-6">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
           <Eyebrow>Studio usage</Eyebrow>
           <h1 className="serif text-display-lg mt-1 tracking-tight">Tokens, cost, and budget.</h1>
@@ -42,7 +42,7 @@ async function UsageContent(spPromise?: Promise<Record<string, string>>) {
         <PeriodSwitcher current={period} />
       </div>
 
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="p-5"><Stat label={`Cost (${period})`} value={formatUsd(all.cost_micros)} sub={`${realRows.reduce((s, r) => s + r.runs, 0)} real runs`} /></Card>
         <Card className="p-5"><Stat label="Input tokens" value={fmtTok(all.tokens_in)} sub={fmtTok(all.cache_create) + " written to cache"} /></Card>
         <Card className="p-5"><Stat label="Output tokens" value={fmtTok(all.tokens_out)} /></Card>

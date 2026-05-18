@@ -21,8 +21,8 @@ export default async function DeliverablesPage({ params }: { params: Promise<{ i
   }
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
-      <div className="flex items-end justify-between gap-6">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
           <Link href={`/campaigns/${c.id}`} className="text-xs text-ink-400 hover:text-ink-100">← {c.name}</Link>
           <h1 className="serif text-display-lg mt-2 tracking-tight">Deliverables</h1>

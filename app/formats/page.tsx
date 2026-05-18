@@ -4,7 +4,7 @@ import { formatsByPlatform } from "@/lib/formats";
 export default function FormatsPage() {
   const groups = formatsByPlatform();
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-10">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-10">
       <div>
         <Eyebrow>Spec library</Eyebrow>
         <h1 className="serif text-display-lg mt-1 tracking-tight">Format catalog</h1>

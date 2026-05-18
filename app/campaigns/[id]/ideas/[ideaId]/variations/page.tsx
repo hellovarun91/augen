@@ -24,7 +24,7 @@ export default async function VariationsPage({ params }: { params: Promise<{ id:
   const defaultFormats = defaultFormatSlugs();
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-10">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-10">
       <div>
         <Link href={`/campaigns/${campaign.id}`} className="text-xs text-ink-400 hover:text-ink-100">← {campaign.name}</Link>
         <div className="flex items-end justify-between gap-6 mt-2">

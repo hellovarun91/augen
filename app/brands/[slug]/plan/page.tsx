@@ -21,8 +21,8 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
   const planned = planQuarter(brand, year, quarter);
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-10">
-      <div className="flex items-end justify-between gap-6">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
           <Eyebrow>{brand.name}</Eyebrow>
           <h1 className="serif text-display-lg mt-1 tracking-tight">Quarterly plan · {quarter} {year}</h1>

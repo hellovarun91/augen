@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default function BrandsPage() {
   const brands = listBrands();
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-10">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-10">
       <Section
         title="Brands"
         subtitle="Each brand is a complete token system. Quarterly plans and ads are generated against this system."

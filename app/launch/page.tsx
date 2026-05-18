@@ -12,7 +12,7 @@ export default async function LaunchPage() {
   if (!user) redirect("/signin");
   if (!activeBrand) {
     return (
-      <div className="px-8 py-10 max-w-7xl mx-auto">
+      <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto">
         <Empty title="No active brand">Switch to a brand to view launch readiness.</Empty>
       </div>
     );
@@ -25,7 +25,7 @@ export default async function LaunchPage() {
   const txns = billing ? listTransactions(activeBrand.id, 12) : [];
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
       <div>
         <Eyebrow>{activeBrand.name} · Launch</Eyebrow>
         <h1 className="serif text-display-lg mt-1 tracking-tight">Run the approved work.</h1>
@@ -35,7 +35,7 @@ export default async function LaunchPage() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="p-5"><Stat label="Approved & ready" value={approved.length} sub="ads waiting to ship" /></Card>
         <Card className="p-5"><Stat label="Campaigns" value={campaigns.length} /></Card>
         <Card className="p-5"><Stat label="Mock balance" value={formatCents(billing?.balance_cents || 0)} sub="studio credits" /></Card>

@@ -30,10 +30,10 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   );
 
   return (
-    <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
       <header className="space-y-3">
         <Link href={`/brands/${brand.slug}`} className="text-xs text-ink-400 hover:text-ink-100">← {brand.name}</Link>
-        <div className="flex items-end justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
           <div>
             <h1 className="serif text-display-lg tracking-tight">{campaign.name}</h1>
             <div className="text-ink-300 mt-1">{campaign.quarter} {campaign.year} · {campaign.objective} · {campaign.audience}</div>
@@ -48,7 +48,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         </div>
       </header>
 
-      <div className="grid md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="p-5"><Eyebrow>Audience</Eyebrow><div className="text-base mt-1 truncate">{campaign.audience || "—"}</div></Card>
         <Card className="p-5"><Eyebrow>Formats enabled</Eyebrow><div className="text-2xl font-medium mt-1">{campaign.brief.formats.length}</div></Card>
         <Card className="p-5"><Eyebrow>Ads generated</Eyebrow><div className="text-2xl font-medium mt-1">{gens.length}</div></Card>
