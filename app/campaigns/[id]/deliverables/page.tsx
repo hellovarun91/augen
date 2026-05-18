@@ -22,10 +22,23 @@ export default async function DeliverablesPage({ params }: { params: Promise<{ i
 
   return (
     <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
-      <div>
-        <Link href={`/campaigns/${c.id}`} className="text-xs text-ink-400 hover:text-ink-100">← {c.name}</Link>
-        <h1 className="serif text-display-lg mt-2 tracking-tight">Deliverables</h1>
-        <p className="text-ink-300 mt-2 max-w-2xl">All ad variants this campaign produced. Grouped by format and platform. Approved ads ship.</p>
+      <div className="flex items-end justify-between gap-6">
+        <div>
+          <Link href={`/campaigns/${c.id}`} className="text-xs text-ink-400 hover:text-ink-100">← {c.name}</Link>
+          <h1 className="serif text-display-lg mt-2 tracking-tight">Deliverables</h1>
+          <p className="text-ink-300 mt-2 max-w-2xl">All ad variants this campaign produced. Grouped by format and platform. Approved ads ship.</p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <a
+            href={`/api/campaigns/${c.id}/export.zip`}
+            className="inline-flex items-center gap-2 rounded-full bg-ink-50 text-ink-950 hover:bg-white h-10 px-4 text-sm font-medium tracking-tight"
+          >
+            Download approved bundle ↓
+          </a>
+          <a href={`/api/campaigns/${c.id}/export.zip?approved=0`} className="text-xs text-ink-400 hover:text-ink-100">
+            or download all variants
+          </a>
+        </div>
       </div>
 
       {gens.length === 0 ? (

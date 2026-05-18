@@ -1,8 +1,13 @@
 "use server";
 import { generateAdsViaAgents, strategistOnly } from "@/lib/agents/orchestrator";
-import { getBrand, getCampaign } from "@/lib/repo";
+import { getBrand, getCampaign, upsertCampaignFormat } from "@/lib/repo";
 import { db, nowMs } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+
+export async function saveFormatLabelAction(campaignId: string, formatSlug: string, label: string | null) {
+  upsertCampaignFormat({ campaignId, formatSlug, label: label?.trim() || null });
+  revalidatePath(`/campaigns/${campaignId}`);
+}
 
 export async function runCampaignAction(campaignId: string, copyConstraint?: string) {
   const c = getCampaign(campaignId);

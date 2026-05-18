@@ -1,5 +1,5 @@
 import { Badge, Card, Empty, Eyebrow, LinkButton, Section } from "@/components/ui/primitives";
-import { getBrand, getCampaign, listGenerationsByCampaign, listIdeas } from "@/lib/repo";
+import { getBrand, getCampaign, listCampaignFormats, listGenerationsByCampaign, listIdeas } from "@/lib/repo";
 import { ALL_FORMATS, formatBySlug, formatsByPlatform } from "@/lib/formats";
 import { notFound } from "next/navigation";
 import { AdPreview } from "@/components/ad-preview";
@@ -25,6 +25,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
   const groupedFormats = formatsByPlatform();
   const enabledFormats = new Set(campaign.brief.formats);
+  const labels = Object.fromEntries(
+    listCampaignFormats(campaign.id).filter((r) => r.label).map((r) => [r.format_slug, r.label!]),
+  );
 
   return (
     <div className="px-8 py-10 max-w-7xl mx-auto space-y-12">
@@ -52,8 +55,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <Card className="p-5"><Eyebrow>Approved</Eyebrow><div className="text-2xl font-medium mt-1">{gens.filter((g) => g.status === "approved").length}</div></Card>
       </div>
 
-      <Section title="The brief" subtitle="Editable. The orchestrator reads this when you press run.">
-        <BriefEditor campaign={campaign} groupedFormats={groupedFormats} />
+      <Section title="The brief" subtitle="Editable. The orchestrator reads this when you press Generate ads.">
+        <BriefEditor campaign={campaign} groupedFormats={groupedFormats} labels={labels} />
       </Section>
 
       <Section
@@ -73,7 +76,10 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                       <div className="serif text-xl tracking-tight">{idea.theme}</div>
                       <div className="text-xs text-ink-400 mt-1">{idea.angle} · {idea.audience}</div>
                     </div>
-                    <Badge>{ideaGens.length} ads</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge>{ideaGens.length} ads</Badge>
+                      <Link href={`/campaigns/${campaign.id}/ideas/${idea.id}/lab`} className="text-xs text-ink-200 hover:text-white">Copy Lab →</Link>
+                    </div>
                   </div>
                   <div className="text-sm text-ink-200">{idea.insight}</div>
                   <div>

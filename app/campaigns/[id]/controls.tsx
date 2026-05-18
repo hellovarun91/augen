@@ -2,7 +2,7 @@
 import { Button, Card, Eyebrow, Label } from "@/components/ui/primitives";
 import type { Campaign } from "@/lib/types";
 import { useState, useTransition } from "react";
-import { runCampaignAction, saveBriefAction } from "./actions";
+import { runCampaignAction, saveBriefAction, saveFormatLabelAction } from "./actions";
 import type { FormatSpec } from "@/lib/formats";
 
 export function RunCampaignButton({ campaignId, ideaCount }: { campaignId: string; ideaCount: number }) {
@@ -23,13 +23,28 @@ export function RunCampaignButton({ campaignId, ideaCount }: { campaignId: strin
   );
 }
 
-export function BriefEditor({ campaign, groupedFormats }: { campaign: Campaign; groupedFormats: Record<string, FormatSpec[]> }) {
+export function BriefEditor({
+  campaign,
+  groupedFormats,
+  labels,
+}: {
+  campaign: Campaign;
+  groupedFormats: Record<string, FormatSpec[]>;
+  labels: Record<string, string>;
+}) {
   const [enabled, setEnabled] = useState<Set<string>>(new Set(campaign.brief.formats));
   const [audience, setAudience] = useState(campaign.audience || "");
   const [notes, setNotes] = useState(campaign.brief.notes || "");
   const [variants, setVariants] = useState(1);
+  const [labelMap, setLabelMap] = useState<Record<string, string>>(labels || {});
   const [pending, start] = useTransition();
   const [saved, setSaved] = useState(false);
+
+  function patchLabel(slug: string, label: string) {
+    const next = { ...labelMap, [slug]: label };
+    setLabelMap(next);
+    // Debounce via fire-and-forget; backend writes immediately on blur via input onBlur below.
+  }
 
   function toggle(slug: string) {
     const next = new Set(enabled);
@@ -85,20 +100,32 @@ export function BriefEditor({ campaign, groupedFormats }: { campaign: Campaign; 
               <div className="text-sm text-ink-100 font-medium">{platform}</div>
               <button onClick={() => toggleAllPlatform(platform)} className="text-xs text-ink-400 hover:text-ink-100">Toggle all</button>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
               {list.map((f) => {
                 const on = enabled.has(f.slug);
                 return (
-                  <button
-                    key={f.slug}
-                    onClick={() => toggle(f.slug)}
-                    className={
-                      "text-xs rounded-full px-3 py-1.5 ring-1 transition-colors " +
-                      (on ? "bg-ink-50 text-ink-950 ring-ink-50" : "bg-ink-800 text-ink-200 ring-white/10 hover:bg-ink-700")
-                    }
-                  >
-                    {f.name} · {f.width}×{f.height}
-                  </button>
+                  <div key={f.slug} className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggle(f.slug)}
+                      className={
+                        "text-xs rounded-full px-3 py-1.5 ring-1 transition-colors whitespace-nowrap " +
+                        (on ? "bg-ink-50 text-ink-950 ring-ink-50" : "bg-ink-800 text-ink-200 ring-white/10 hover:bg-ink-700")
+                      }
+                    >
+                      {f.name} · {f.width}×{f.height}
+                    </button>
+                    {on && (
+                      <input
+                        defaultValue={labelMap[f.slug] || ""}
+                        placeholder={`Rename for this campaign (default: ${f.name})`}
+                        onBlur={async (e) => {
+                          patchLabel(f.slug, e.target.value);
+                          await saveFormatLabelAction(campaign.id, f.slug, e.target.value || null);
+                        }}
+                        className="flex-1 rounded-lg bg-ink-800 px-2 py-1 text-xs text-ink-100 ring-1 ring-inset ring-white/10"
+                      />
+                    )}
+                  </div>
                 );
               })}
             </div>
