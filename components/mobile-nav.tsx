@@ -9,10 +9,12 @@ export function MobileNav({
   user,
   brands,
   activeBrand,
+  isAdmin = false,
 }: {
   user: { id: string; name: string; email: string; color: string } | null;
   brands: Array<{ id: string; slug: string; name: string; tokens: { palette: { primary: string; accent: string } } }>;
   activeBrand: { id: string; slug: string; name: string } | null;
+  isAdmin?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const path = usePathname() || "/";
@@ -132,6 +134,15 @@ export function MobileNav({
             <NavSection label="Launch">
               {launchNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href} />)}
             </NavSection>
+
+            {isAdmin && (
+              <NavSection label="Admin">
+                <DrawerItem href="/admin" label="Overview" active={path === "/admin"} />
+                <DrawerItem href="/admin/testers" label="Testers" active={path === "/admin/testers"} />
+                <DrawerItem href="/admin/users" label="Users" active={path.startsWith("/admin/users")} />
+                <DrawerItem href="/admin/features" label="Feature flags" active={path === "/admin/features"} />
+              </NavSection>
+            )}
 
             <div className="mt-auto px-4 py-4 border-t border-white/5">
               {user ? (

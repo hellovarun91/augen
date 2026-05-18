@@ -67,6 +67,7 @@ export function SidebarNav({
       {isAdmin && (
         <Section label="Admin">
           <NavItem href="/admin" label="Overview" active={path === "/admin"} />
+          <NavItem href="/admin/testers" label="Testers" active={path === "/admin/testers"} />
           <NavItem href="/admin/users" label="Users" active={path.startsWith("/admin/users")} />
           <NavItem href="/admin/features" label="Feature flags" active={path === "/admin/features"} />
         </Section>

@@ -369,6 +369,15 @@ function migrate(d: Database.Database) {
 
   try { d.prepare("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'").run(); } catch {}
   try { d.prepare("ALTER TABLE users ADD COLUMN last_seen_at INTEGER").run(); } catch {}
+
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS allowed_emails (
+    email TEXT PRIMARY KEY,
+    added_by_user_id TEXT,
+    added_at INTEGER NOT NULL,
+    note TEXT
+  );
+  `);
 }
 
 export function nowMs() {

@@ -2,7 +2,24 @@
 import { logAdminAction, requireAdmin, setUserStatus } from "@/lib/admin";
 import { setFeatureGlobalState, setUserOverride } from "@/lib/features";
 import { changeTier, topUp, type Tier } from "@/lib/credits";
+import { addAllowedEmail, removeAllowedEmail } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
+
+export async function addTesterAction(fd: FormData) {
+  const admin = await requireAdmin();
+  const email = String(fd.get("email") || "").trim();
+  const note = String(fd.get("note") || "").trim() || undefined;
+  addAllowedEmail(email, admin.id, note);
+  logAdminAction({ adminUserId: admin.id, action: "tester.add", payload: { email, note } });
+  revalidatePath("/admin/testers");
+}
+
+export async function removeTesterAction(email: string) {
+  const admin = await requireAdmin();
+  removeAllowedEmail(email);
+  logAdminAction({ adminUserId: admin.id, action: "tester.remove", payload: { email } });
+  revalidatePath("/admin/testers");
+}
 
 export async function setStatusAction(userId: string, status: "active" | "disabled") {
   const admin = await requireAdmin();

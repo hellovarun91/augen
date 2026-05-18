@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { getSession } from "@/lib/session";
+import { isAdmin } from "@/lib/admin";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           user={user ? { id: user.id, name: user.name, email: user.email, color: user.avatar_color } : null}
           brands={brands.map((b) => ({ id: b.id, slug: b.slug, name: b.name, tokens: { palette: { primary: b.tokens.palette.primary, accent: b.tokens.palette.accent } } }))}
           activeBrand={activeBrand ? { id: activeBrand.id, slug: activeBrand.slug, name: activeBrand.name } : null}
+          isAdmin={isAdmin(user)}
         />
         <div className="flex">
           <Sidebar />
