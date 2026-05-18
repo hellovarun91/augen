@@ -450,6 +450,166 @@ export function upsertCampaignFormat(input: {
   }
 }
 
+// ---------- Anchors (approved + winners + starred) feed agents ----------
+
+export interface AnchorCopy {
+  source: "approved" | "winner" | "starred";
+  eyebrow?: string;
+  headline: string;
+  subhead?: string;
+  cta?: string;
+  metric_label?: string;
+  format_slug?: string;
+}
+
+export function listAnchorCopy(brandId: string, limit = 10): AnchorCopy[] {
+  const out: AnchorCopy[] = [];
+  const winners = db().prepare(`
+    SELECT eyebrow, headline, subhead, cta, format_slug, metric_label
+    FROM external_winners WHERE brand_id = ? AND is_winner = 1
+    ORDER BY created_at DESC LIMIT ?
+  `).all(brandId, limit) as any[];
+  for (const w of winners) out.push({ source: "winner", ...w });
+
+  const perfWinners = db().prepare(`
+    SELECT eyebrow, headline, subhead, cta, format_slug
+    FROM generations WHERE brand_id = ? AND is_winner = 1
+    ORDER BY updated_at DESC LIMIT ?
+  `).all(brandId, limit) as any[];
+  for (const g of perfWinners) {
+    if (!out.some((a) => a.headline === g.headline)) out.push({ source: "winner", ...g });
+  }
+
+  const approved = db().prepare(`
+    SELECT eyebrow, headline, subhead, cta, format_slug
+    FROM generations WHERE brand_id = ? AND status = 'approved'
+    ORDER BY updated_at DESC LIMIT ?
+  `).all(brandId, limit) as any[];
+  for (const g of approved) {
+    if (!out.some((a) => a.headline === g.headline)) out.push({ source: "approved", ...g });
+  }
+
+  const starred = db().prepare(`
+    SELECT cv.eyebrow, cv.headline, cv.subhead, cv.cta
+    FROM copy_variants cv
+    JOIN ideas i ON i.id = cv.idea_id
+    JOIN campaigns c ON c.id = i.campaign_id
+    WHERE c.brand_id = ? AND cv.starred = 1
+    ORDER BY cv.created_at DESC LIMIT ?
+  `).all(brandId, limit) as any[];
+  for (const s of starred) {
+    if (!out.some((a) => a.headline === s.headline)) out.push({ source: "starred", ...s });
+  }
+
+  return out.slice(0, limit);
+}
+
+// ---------- External winners ----------
+
+export interface ExternalWinnerRow {
+  id: string; brand_id: string; label: string | null; format_slug: string | null;
+  eyebrow: string | null; headline: string; subhead: string | null; cta: string | null;
+  source: string | null; notes: string | null; metric_label: string | null;
+  is_winner: number; created_at: number;
+}
+
+export function listExternalWinners(brandId: string): ExternalWinnerRow[] {
+  return db().prepare("SELECT * FROM external_winners WHERE brand_id = ? ORDER BY created_at DESC").all(brandId) as ExternalWinnerRow[];
+}
+
+export function createExternalWinner(input: {
+  brandId: string; label?: string; formatSlug?: string;
+  eyebrow?: string; headline: string; subhead?: string; cta?: string;
+  source?: string; notes?: string; metricLabel?: string;
+}): ExternalWinnerRow {
+  const id = `winr_${nanoid(10)}`;
+  db().prepare(`
+    INSERT INTO external_winners (id, brand_id, label, format_slug, eyebrow, headline, subhead, cta, source, notes, metric_label, is_winner, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+  `).run(
+    id, input.brandId, input.label || null, input.formatSlug || null,
+    input.eyebrow || null, input.headline, input.subhead || null, input.cta || null,
+    input.source || "manual", input.notes || null, input.metricLabel || null, nowMs(),
+  );
+  return db().prepare("SELECT * FROM external_winners WHERE id = ?").get(id) as ExternalWinnerRow;
+}
+
+export function deleteExternalWinner(id: string) {
+  db().prepare("DELETE FROM external_winners WHERE id = ?").run(id);
+}
+
+export function setGenerationWinner(id: string, isWinner: boolean) {
+  db().prepare("UPDATE generations SET is_winner = ?, updated_at = ? WHERE id = ?").run(isWinner ? 1 : 0, nowMs(), id);
+}
+
+// ---------- Performance ingestion ----------
+
+export function recordPerformance(input: {
+  generationId: string; source: string;
+  impressions?: number; clicks?: number; ctr?: number; conversions?: number;
+  spendCents?: number; roas?: number; isWinner?: boolean; notes?: string;
+  periodStart?: number; periodEnd?: number;
+}) {
+  const id = `perf_${nanoid(10)}`;
+  db().prepare(`
+    INSERT INTO asset_performance (id, generation_id, source, period_start, period_end, impressions, clicks, ctr, conversions, spend_cents, roas, is_winner, notes, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, input.generationId, input.source,
+    input.periodStart || null, input.periodEnd || null,
+    input.impressions ?? null, input.clicks ?? null, input.ctr ?? null, input.conversions ?? null,
+    input.spendCents ?? null, input.roas ?? null,
+    input.isWinner ? 1 : 0, input.notes || null, nowMs(),
+  );
+  if (input.isWinner) setGenerationWinner(input.generationId, true);
+}
+
+// ---------- Rule proposals ----------
+
+export interface RuleProposalRow {
+  id: string; brand_id: string; kind: "do" | "dont" | "preferred" | "banned";
+  rule: string; evidence: string | null;
+  status: "pending" | "accepted" | "dismissed"; created_at: number;
+}
+
+export function listRuleProposals(brandId: string, status?: "pending" | "accepted" | "dismissed"): RuleProposalRow[] {
+  const sql = status
+    ? "SELECT * FROM rule_proposals WHERE brand_id = ? AND status = ? ORDER BY created_at DESC"
+    : "SELECT * FROM rule_proposals WHERE brand_id = ? ORDER BY created_at DESC";
+  const args = status ? [brandId, status] : [brandId];
+  return db().prepare(sql).all(...args) as RuleProposalRow[];
+}
+
+export function createRuleProposal(input: { brandId: string; kind: "do" | "dont" | "preferred" | "banned"; rule: string; evidence?: string }) {
+  const id = `rp_${nanoid(10)}`;
+  db().prepare(`
+    INSERT INTO rule_proposals (id, brand_id, kind, rule, evidence, status, created_at)
+    VALUES (?, ?, ?, ?, ?, 'pending', ?)
+  `).run(id, input.brandId, input.kind, input.rule, input.evidence || null, nowMs());
+}
+
+export function getRuleProposal(id: string): RuleProposalRow | null {
+  return (db().prepare("SELECT * FROM rule_proposals WHERE id = ?").get(id) as RuleProposalRow) || null;
+}
+
+export function updateRuleProposalStatus(id: string, status: "accepted" | "dismissed") {
+  db().prepare("UPDATE rule_proposals SET status = ? WHERE id = ?").run(status, id);
+}
+
+export function clearPendingProposals(brandId: string) {
+  db().prepare("UPDATE rule_proposals SET status = 'dismissed' WHERE brand_id = ? AND status = 'pending'").run(brandId);
+}
+
+export function collectReviewerNotes(brandId: string, limit = 80): Array<{ note: string; verdict: string; format_slug: string; headline: string }> {
+  return db().prepare(`
+    SELECT r.note as note, r.action as verdict, g.format_slug as format_slug, g.headline as headline
+    FROM reviews r
+    JOIN generations g ON g.id = r.generation_id
+    WHERE g.brand_id = ? AND r.note IS NOT NULL AND r.note != ''
+    ORDER BY r.created_at DESC LIMIT ?
+  `).all(brandId, limit) as any;
+}
+
 export function listTransactions(brandId: string, limit = 50) {
   const acc = getBilling(brandId);
   if (!acc) return [];

@@ -240,6 +240,56 @@ function migrate(d: Database.Database) {
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_create_tokens INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_read_tokens INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cost_micros INTEGER").run(); } catch {} // USD * 1_000_000
+
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS external_winners (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    label TEXT,
+    format_slug TEXT,
+    eyebrow TEXT,
+    headline TEXT NOT NULL,
+    subhead TEXT,
+    cta TEXT,
+    source TEXT,
+    notes TEXT,
+    metric_label TEXT,
+    is_winner INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS ew_brand_idx ON external_winners(brand_id);
+
+  CREATE TABLE IF NOT EXISTS asset_performance (
+    id TEXT PRIMARY KEY,
+    generation_id TEXT NOT NULL REFERENCES generations(id) ON DELETE CASCADE,
+    source TEXT NOT NULL,
+    period_start INTEGER,
+    period_end INTEGER,
+    impressions INTEGER,
+    clicks INTEGER,
+    ctr REAL,
+    conversions INTEGER,
+    spend_cents INTEGER,
+    roas REAL,
+    is_winner INTEGER NOT NULL DEFAULT 0,
+    notes TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS perf_gen_idx ON asset_performance(generation_id);
+
+  CREATE TABLE IF NOT EXISTS rule_proposals (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    rule TEXT NOT NULL,
+    evidence TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS rp_brand_idx ON rule_proposals(brand_id);
+  `);
+
+  try { d.prepare("ALTER TABLE generations ADD COLUMN is_winner INTEGER NOT NULL DEFAULT 0").run(); } catch {}
 }
 
 export function nowMs() {

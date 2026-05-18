@@ -1,16 +1,18 @@
 "use client";
 import { Button, Card, Eyebrow, Label, TextArea, Input } from "@/components/ui/primitives";
 import { useState, useTransition } from "react";
-import { approveAd, rejectAd, requestRevision, saveCopy } from "./actions";
+import { approveAd, rejectAd, requestRevision, saveCopy, toggleWinnerAction } from "./actions";
 
 export function ReviewControls({
   generationId,
   status,
   initial,
+  isWinner,
 }: {
   generationId: string;
   status: string;
   initial: { headline: string; subhead: string; cta: string; eyebrow: string };
+  isWinner: boolean;
 }) {
   const [note, setNote] = useState("");
   const [pending, start] = useTransition();
@@ -36,7 +38,15 @@ export function ReviewControls({
         <Label>Reviewer note</Label>
         <TextArea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Optional — e.g., headline too long for mobile feed" />
       </div>
-      <div className="text-[11px] text-ink-400">Current: {status.replace("_", " ")}</div>
+      <div className="flex items-center justify-between">
+        <div className="text-[11px] text-ink-400">Current: {status.replace("_", " ")}</div>
+        <button
+          onClick={() => start(async () => { await toggleWinnerAction(generationId, !isWinner); })}
+          className={"text-[11px] rounded-full px-2.5 py-1 ring-1 transition-colors " + (isWinner ? "bg-amber-500/20 text-amber-200 ring-amber-500/40" : "bg-white/5 text-ink-300 ring-white/10 hover:bg-white/10")}
+        >
+          {isWinner ? "★ winner — feeds agents" : "Mark as winner"}
+        </button>
+      </div>
 
       <div className="pt-3 border-t border-white/5">
         <button onClick={() => setEditing((v) => !v)} className="text-xs text-ink-300 hover:text-ink-100">

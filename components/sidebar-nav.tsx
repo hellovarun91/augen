@@ -21,6 +21,7 @@ export function SidebarNav({
         { href: `/brands/${activeBrand.slug}/tokens/extract`, label: "Extract from artwork", group: "brand" },
         { href: `/brands/${activeBrand.slug}/figma`, label: "Figma sync", group: "brand" },
         { href: `/brands/${activeBrand.slug}/references`, label: "References", group: "brand" },
+        { href: `/brands/${activeBrand.slug}/winners`, label: "Winners (learning)", group: "brand" },
         { href: `/brands/${activeBrand.slug}/plan`, label: "Quarterly plan", group: "brand" },
       ]
     : [];

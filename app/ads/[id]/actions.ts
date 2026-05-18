@@ -1,6 +1,11 @@
 "use server";
-import { updateGenerationStatus, updateGenerationCopy } from "@/lib/repo";
+import { updateGenerationStatus, updateGenerationCopy, setGenerationWinner } from "@/lib/repo";
 import { revalidatePath } from "next/cache";
+
+export async function toggleWinnerAction(id: string, on: boolean) {
+  setGenerationWinner(id, on);
+  revalidatePath(`/ads/${id}`);
+}
 
 export async function approveAd(id: string, note?: string) {
   updateGenerationStatus(id, "approved", note);

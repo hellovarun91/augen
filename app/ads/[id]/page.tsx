@@ -66,9 +66,12 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
             </div>
           </Card>
 
-          <ReviewControls generationId={gen.id} status={gen.status} initial={{
-            headline: gen.headline, subhead: gen.subhead || "", cta: gen.cta, eyebrow: gen.eyebrow || "",
-          }} />
+          <ReviewControls
+            generationId={gen.id}
+            status={gen.status}
+            initial={{ headline: gen.headline, subhead: gen.subhead || "", cta: gen.cta, eyebrow: gen.eyebrow || "" }}
+            isWinner={(gen as any).is_winner === 1}
+          />
 
           <Card className="p-5 space-y-3">
             <Eyebrow>Image prompt</Eyebrow>

@@ -1,7 +1,8 @@
 import { Card, Eyebrow, Section, Badge } from "@/components/ui/primitives";
-import { getBrandBySlug } from "@/lib/repo";
+import { getBrandBySlug, listRuleProposals } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import { LanguageEditor } from "./editor";
+import { ProposalsPanel } from "./proposals";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,10 @@ export default async function LanguagePage({ params }: { params: Promise<{ slug:
       </div>
 
       <LanguageEditor brand={brand} />
+
+      <Section title="Suggested rules (from reviewer notes)" subtitle="The Rule Refiner clusters past reviewer notes into proposed Do/Don't and lexicon entries. One-click promote to apply.">
+        <ProposalsPanel brandId={brand.id} brandSlug={brand.slug} proposals={listRuleProposals(brand.id, "pending")} />
+      </Section>
 
       <Section title="How the agents read this">
         <div className="grid md:grid-cols-3 gap-4">

@@ -76,43 +76,63 @@ export interface GeneratedResult {
   height: number;
 }
 
+// Models tried in order. First one with quota wins. Override or extend via env.
+function imageModelChain(): string[] {
+  const raw = process.env.GEMINI_IMAGE_MODEL_CHAIN || process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview,gemini-2.5-flash-image-preview,imagen-3.0-generate-002";
+  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+async function callGemini(model: string, key: string, prompt: string): Promise<{ bytes: Buffer; mime: string } | { error: string }> {
+  // Imagen uses :predict, Gemini image uses :generateContent
+  const isImagen = model.startsWith("imagen");
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:${isImagen ? "predict" : "generateContent"}?key=${key}`;
+  const body = isImagen
+    ? { instances: [{ prompt }], parameters: { sampleCount: 1 } }
+    : {
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { responseModalities: ["IMAGE"] },
+      };
+  const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!r.ok) {
+    const txt = await r.text();
+    return { error: `${r.status}: ${txt.slice(0, 240)}` };
+  }
+  const j: any = await r.json();
+  if (isImagen) {
+    const pred = j?.predictions?.[0];
+    const b64 = pred?.bytesBase64Encoded;
+    if (!b64) return { error: "imagen: no bytesBase64Encoded in response" };
+    return { bytes: Buffer.from(b64, "base64"), mime: pred?.mimeType || "image/png" };
+  }
+  const part = j?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
+  if (!part) return { error: "gemini: no inlineData in response" };
+  return { bytes: Buffer.from(part.inlineData.data, "base64"), mime: part.inlineData.mimeType || "image/png" };
+}
+
 export async function generateImage(prompt: string, aspectHint: string): Promise<GeneratedResult | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  const model = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+  const chain = imageModelChain();
   const fullPrompt = `${prompt}\n\nAspect ratio: ${aspectHint}. Photographic, real subject, single image, no text, no logos, no watermark.`;
 
-  try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-          generationConfig: { responseModalities: ["IMAGE"] },
-        }),
-      },
-    );
-    if (!r.ok) {
-      const body = await r.text();
-      console.warn(`[gemini] ${r.status} ${r.statusText}: ${body.slice(0, 200)}`);
-      return null;
+  let lastError: string | null = null;
+  for (const model of chain) {
+    try {
+      const out = await callGemini(model, key, fullPrompt);
+      if ("error" in out) {
+        console.warn(`[image] ${model} → ${out.error}`);
+        lastError = out.error;
+        continue;
+      }
+      const [aw, ah] = parseAspect(aspectHint);
+      return { bytes: out.bytes, mime: out.mime, source: "gemini", prompt, width: aw, height: ah };
+    } catch (e: any) {
+      console.warn(`[image] ${model} threw:`, e?.message || e);
+      lastError = e?.message || String(e);
     }
-    const j: any = await r.json();
-    const part = j?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
-    if (!part) {
-      console.warn("[gemini] response had no inlineData");
-      return null;
-    }
-    const mime = part.inlineData.mimeType || "image/png";
-    const bytes = Buffer.from(part.inlineData.data, "base64");
-    const [aw, ah] = parseAspect(aspectHint);
-    return { bytes, mime, source: "gemini", prompt, width: aw, height: ah };
-  } catch (e: any) {
-    console.warn("[gemini] threw:", e?.message || e);
-    return null;
   }
+  if (lastError) console.warn(`[image] all providers failed. last: ${lastError}`);
+  return null;
 }
 
 export function geminiStatus(): { enabled: boolean; model: string; reason?: string } {
