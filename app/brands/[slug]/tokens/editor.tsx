@@ -164,10 +164,10 @@ export function TokensEditor({ brand }: { brand: Brand }) {
         </div>
       </div>
 
-      <div className="space-y-4">
-        <Card className="p-4 sticky top-6">
+      <div className="space-y-4 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto pr-1">
+        <Card className="p-4">
           <Eyebrow>Live preview · 4:5 feed</Eyebrow>
-          <div className="mt-3">
+          <div className="mt-3 max-w-sm mx-auto">
             <AdPreviewPreview
               key={bumpVersion + "-fb45"}
               brandId={brand.id}
@@ -183,7 +183,7 @@ export function TokensEditor({ brand }: { brand: Brand }) {
         </Card>
         <Card className="p-4">
           <Eyebrow>Live preview · 9:16 story</Eyebrow>
-          <div className="mt-3 max-w-xs mx-auto">
+          <div className="mt-3 max-w-[240px] mx-auto">
             <AdPreviewPreview
               key={bumpVersion + "-st"}
               brandId={brand.id}
