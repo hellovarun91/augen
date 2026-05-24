@@ -3,7 +3,8 @@ import { Button, Card, Eyebrow, Input, Label } from "@/components/ui/primitives"
 import type { Campaign } from "@/lib/types";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { runCampaignAction, saveBriefAction, saveFormatLabelAction } from "./actions";
+import { runCampaignAction, saveBriefAction, saveFormatLabelAction, signOffProjectAction, reopenProjectAction } from "./actions";
+import { relativeDate } from "@/lib/utils";
 import { renameProjectAction, deleteProjectAction } from "../actions";
 import type { FormatSpec } from "@/lib/formats";
 
@@ -35,6 +36,65 @@ export function ProjectDetailActions({ campaignId, name }: { campaignId: string;
       <button onClick={() => { setDraft(name); setRenaming(true); }} className="hover:text-ink-100">Rename</button>
       <button onClick={remove} className="hover:text-rose-300" disabled={pending}>Delete project</button>
     </div>
+  );
+}
+
+export function ProjectSignoff({
+  campaignId, total, approved, signedOffBy, signedOffAt,
+}: {
+  campaignId: string; total: number; approved: number;
+  signedOffBy: string | null; signedOffAt: number | null;
+}) {
+  const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
+  const router = useRouter();
+
+  function signOff() {
+    setErr(null);
+    start(async () => {
+      try { await signOffProjectAction(campaignId); router.refresh(); }
+      catch (e: any) { setErr(e?.message || "Could not sign off"); }
+    });
+  }
+  function reopen() {
+    setErr(null);
+    start(async () => {
+      try { await reopenProjectAction(campaignId); router.refresh(); }
+      catch (e: any) { setErr(e?.message || "Could not reopen"); }
+    });
+  }
+
+  if (signedOffBy) {
+    return (
+      <Card className="p-5 ring-1 ring-emerald-400/20 bg-emerald-400/[0.04]">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <Eyebrow>Signed off</Eyebrow>
+            <div className="text-sm text-ink-100 mt-1">{signedOffBy}{signedOffAt ? ` · ${relativeDate(signedOffAt)}` : ""}</div>
+            <div className="text-[11px] text-ink-400 mt-0.5">{approved} of {total} creatives approved when signed off.</div>
+          </div>
+          <button onClick={reopen} disabled={pending} className="text-xs text-ink-400 hover:text-ink-100 shrink-0">{pending ? "…" : "Reopen"}</button>
+        </div>
+        {err && <div className="text-xs text-rose-300 mt-2">{err}</div>}
+      </Card>
+    );
+  }
+
+  const allApproved = total > 0 && approved === total;
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <Eyebrow>Sign-off</Eyebrow>
+          <div className="text-sm text-ink-200 mt-1">{approved} of {total} creatives approved.</div>
+          <div className="text-[11px] text-ink-400 mt-0.5">
+            {total === 0 ? "Generate creatives before signing off." : allApproved ? "Everything's approved — ready to sign off." : "You can sign off before every creative is approved."}
+          </div>
+        </div>
+        <Button size="sm" onClick={signOff} disabled={pending || total === 0}>{pending ? "Signing off…" : "Sign off project"}</Button>
+      </div>
+      {err && <div className="text-xs text-rose-300 mt-2">{err}</div>}
+    </Card>
   );
 }
 

@@ -250,6 +250,9 @@ function migrate(d: Database.Database) {
   try { d.prepare("ALTER TABLE brands ADD COLUMN figma_file_url TEXT").run(); } catch {}
   try { d.prepare("ALTER TABLE brands ADD COLUMN copy_schema TEXT").run(); } catch {}
   try { d.prepare("ALTER TABLE campaigns ADD COLUMN copy_schema TEXT").run(); } catch {}
+  // Project sign-off: who marked the project signed-off, and when (additive — older rows null)
+  try { d.prepare("ALTER TABLE campaigns ADD COLUMN signed_off_by TEXT").run(); } catch {}
+  try { d.prepare("ALTER TABLE campaigns ADD COLUMN signed_off_at INTEGER").run(); } catch {}
   // Detailed usage tracking columns on agent_runs (additive — older rows have nulls)
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_create_tokens INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_read_tokens INTEGER").run(); } catch {}

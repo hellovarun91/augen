@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { AdPreview } from "@/components/ad-preview";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
 import { CommentThread } from "@/components/comment-thread";
-import { RunCampaignButton, BriefEditor, ProjectDetailActions } from "./controls";
+import { RunCampaignButton, BriefEditor, ProjectDetailActions, ProjectSignoff } from "./controls";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +36,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const { user } = await getSession();
   const members = listMembershipsForBrand(brand.id).map((m) => ({ id: m.user_id, name: m.user.name, color: m.user.avatar_color }));
   const comments = listComments("project", campaign.id);
+  const approvedCount = gens.filter((g) => g.status === "approved").length;
+  const signedOffByName = campaign.signed_off_by ? (members.find((m) => m.id === campaign.signed_off_by)?.name || "A teammate") : null;
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
@@ -62,8 +64,16 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <Card className="p-5"><Eyebrow>Audience</Eyebrow><div className="text-base mt-1 truncate">{campaign.audience || "—"}</div></Card>
         <Card className="p-5"><Eyebrow>Formats enabled</Eyebrow><div className="text-2xl font-medium mt-1">{campaign.brief.formats.length}</div></Card>
         <Card className="p-5"><Eyebrow>Creatives</Eyebrow><div className="text-2xl font-medium mt-1">{gens.length}</div></Card>
-        <Card className="p-5"><Eyebrow>Approved</Eyebrow><div className="text-2xl font-medium mt-1">{gens.filter((g) => g.status === "approved").length}</div></Card>
+        <Card className="p-5"><Eyebrow>Approved</Eyebrow><div className="text-2xl font-medium mt-1">{approvedCount}</div></Card>
       </div>
+
+      <ProjectSignoff
+        campaignId={campaign.id}
+        total={gens.length}
+        approved={approvedCount}
+        signedOffBy={signedOffByName}
+        signedOffAt={campaign.signed_off_at}
+      />
 
       <Section title="The brief" subtitle="Editable. The orchestrator reads this when you press Generate ads.">
         <BriefEditor campaign={campaign} groupedFormats={groupedFormats} labels={labels} />

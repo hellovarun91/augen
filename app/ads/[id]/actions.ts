@@ -56,20 +56,20 @@ export async function removeReplacedImageAction(id: string) {
 }
 
 export async function approveAd(id: string, note?: string) {
-  await requireGenerationAccess(id);
-  updateGenerationStatus(id, "approved", note);
+  const { user } = await requireGenerationAccess(id);
+  updateGenerationStatus(id, "approved", note, user.id);
   revalidatePath(`/ads/${id}`);
   revalidatePath("/review");
 }
 export async function rejectAd(id: string, note?: string) {
-  await requireGenerationAccess(id);
-  updateGenerationStatus(id, "rejected", note);
+  const { user } = await requireGenerationAccess(id);
+  updateGenerationStatus(id, "rejected", note, user.id);
   revalidatePath(`/ads/${id}`);
   revalidatePath("/review");
 }
 export async function requestRevision(id: string, note?: string) {
-  await requireGenerationAccess(id);
-  updateGenerationStatus(id, "needs_revision", note);
+  const { user } = await requireGenerationAccess(id);
+  updateGenerationStatus(id, "needs_revision", note, user.id);
   revalidatePath(`/ads/${id}`);
   revalidatePath("/review");
 }

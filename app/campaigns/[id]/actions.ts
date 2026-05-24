@@ -1,6 +1,6 @@
 "use server";
 import { generateAdsViaAgents, strategistOnly } from "@/lib/agents/orchestrator";
-import { getBrand, getCampaign, upsertCampaignFormat } from "@/lib/repo";
+import { getBrand, getCampaign, upsertCampaignFormat, signOffCampaign, clearCampaignSignoff } from "@/lib/repo";
 import { db, nowMs } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { requireCampaignAccess } from "@/lib/authz";
@@ -72,6 +72,20 @@ export async function runStrategistAction(campaignId: string, opts: { count: num
   revalidatePath(`/campaigns/${campaignId}`);
   revalidatePath(`/campaigns/${campaignId}/agents`);
   return result;
+}
+
+export async function signOffProjectAction(campaignId: string) {
+  const { user } = await requireCampaignAccess(campaignId);
+  signOffCampaign(campaignId, user.id);
+  revalidatePath(`/campaigns/${campaignId}`);
+  revalidatePath("/review");
+}
+
+export async function reopenProjectAction(campaignId: string) {
+  await requireCampaignAccess(campaignId);
+  clearCampaignSignoff(campaignId);
+  revalidatePath(`/campaigns/${campaignId}`);
+  revalidatePath("/review");
 }
 
 export async function saveBriefAction(campaignId: string, patch: {

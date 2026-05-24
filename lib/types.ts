@@ -162,6 +162,8 @@ export interface CampaignRow {
   brief: string;
   template_id: string | null;
   status: string;
+  signed_off_by: string | null;
+  signed_off_at: number | null;
   created_at: number;
   updated_at: number;
 }

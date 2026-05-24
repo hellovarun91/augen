@@ -289,14 +289,46 @@ export function listAllGenerations(limit = 500): Generation[] {
   return rows.map((r) => ({ ...r, copy: JSON.parse(r.copy_json || "[]"), palette: JSON.parse(r.palette || "[]") }));
 }
 
-export function updateGenerationStatus(id: string, status: string, note?: string) {
+export function updateGenerationStatus(id: string, status: string, note?: string, reviewerId?: string) {
   db().prepare("UPDATE generations SET status = ?, notes = COALESCE(?, notes), updated_at = ? WHERE id = ?").run(
     status, note ?? null, nowMs(), id,
   );
   const rev = `rev_${nanoid(8)}`;
   db().prepare("INSERT INTO reviews (id, generation_id, action, note, reviewer, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
-    rev, id, status, note ?? null, "studio", nowMs(),
+    rev, id, status, note ?? null, reviewerId ?? "studio", nowMs(),
   );
+}
+
+export interface ReviewRow {
+  id: string; generation_id: string; action: string; note: string | null;
+  reviewer: string | null; created_at: number;
+  reviewer_name: string; reviewer_color: string;
+}
+
+// Review history for a creative, newest first, with the human reviewer resolved.
+export function listReviews(generationId: string): ReviewRow[] {
+  const rows = db().prepare(`
+    SELECT r.*, u.name u_name, u.avatar_color u_color
+    FROM reviews r LEFT JOIN users u ON u.id = r.reviewer
+    WHERE r.generation_id = ?
+    ORDER BY r.created_at DESC
+  `).all(generationId) as any[];
+  return rows.map((r) => ({
+    id: r.id, generation_id: r.generation_id, action: r.action, note: r.note,
+    reviewer: r.reviewer, created_at: r.created_at,
+    reviewer_name: r.u_name || (r.reviewer === "studio" ? "Studio" : r.reviewer || "Someone"),
+    reviewer_color: r.u_color || "#8A8A93",
+  }));
+}
+
+// ---------- Project sign-off (stakeholder approval) ----------
+export function signOffCampaign(id: string, userId: string) {
+  db().prepare("UPDATE campaigns SET signed_off_by = ?, signed_off_at = ?, status = 'approved', updated_at = ? WHERE id = ?")
+    .run(userId, nowMs(), nowMs(), id);
+}
+export function clearCampaignSignoff(id: string) {
+  db().prepare("UPDATE campaigns SET signed_off_by = NULL, signed_off_at = NULL, updated_at = ? WHERE id = ?")
+    .run(nowMs(), id);
 }
 
 export function updateGenerationReference(generationId: string, referenceId: string | null) {

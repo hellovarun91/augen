@@ -1,5 +1,5 @@
 import { Badge, Eyebrow } from "@/components/ui/primitives";
-import { getBrand, getCampaign, getGeneration, getGenerationOverrides, getIdea, listAssets, listComments } from "@/lib/repo";
+import { getBrand, getCampaign, getGeneration, getGenerationOverrides, getIdea, listAssets, listComments, listReviews } from "@/lib/repo";
 import { listMembershipsForBrand } from "@/lib/users";
 import { getSession } from "@/lib/session";
 import { formatBySlug } from "@/lib/formats";
@@ -25,6 +25,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
   const { user } = await getSession();
   const members = listMembershipsForBrand(brand.id).map((m) => ({ id: m.user_id, name: m.user.name, color: m.user.avatar_color }));
   const comments = listComments("creative", gen.id);
+  const reviews = listReviews(gen.id);
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-8">
@@ -66,6 +67,33 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         ideaSummary={idea ? { theme: idea.theme, angle: idea.angle, audience: idea.audience, insight: idea.insight || "" } : null}
         assets={listAssets(brand.id).map((a) => ({ id: a.id, label: a.label, file_path: a.file_path, kind: a.kind }))}
       />
+
+      {reviews.length > 0 && (
+        <Section title="Review history" subtitle="Who decided what, and when.">
+          <Card className="p-0 overflow-hidden">
+            <ul>
+              {reviews.map((r) => {
+                const tone = r.action === "approved" ? "ok" : r.action === "rejected" ? "danger" : r.action === "needs_revision" ? "warn" : "neutral";
+                return (
+                  <li key={r.id} className="flex items-start gap-3 px-5 py-3 border-b border-white/5 last:border-b-0">
+                    <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 mt-0.5" style={{ background: r.reviewer_color, color: "#0A0A0B" }}>
+                      {r.reviewer_name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-ink-100">{r.reviewer_name}</span>
+                        <Badge tone={tone as any}>{r.action.replace("_", " ")}</Badge>
+                        <span className="text-ink-500">{relativeDate(r.created_at)}</span>
+                      </div>
+                      {r.note && <p className="text-sm text-ink-300 mt-1 whitespace-pre-wrap">{r.note}</p>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        </Section>
+      )}
 
       <Section title="Discussion" subtitle="Feedback on this creative — @mention a teammate.">
         <Card className="p-5">
