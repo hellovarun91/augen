@@ -18,7 +18,7 @@ export function SidebarNav({
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const b = contextBrand?.slug;
-  const onTokens = !!b && path.startsWith(`/brands/${b}/tokens`);
+  const onTokens = !!b && (path.startsWith(`/brands/${b}/tokens`) || path.startsWith(`/brands/${b}/figma`));
 
   return (
     <div className="flex-1 flex flex-col">
@@ -30,6 +30,7 @@ export function SidebarNav({
 
           <Section label="Manage Brand">
             <NavItem href={`/brands/${b}`} label="Overview" active={path === `/brands/${b}`} />
+            <NavItem href={`/brands/${b}/identity`} label="Identity" active={path.startsWith(`/brands/${b}/identity`)} />
             <NavItem href={`/brands/${b}/language`} label="Language" active={path.startsWith(`/brands/${b}/language`)} />
             <NavItem href={`/brands/${b}/tokens`} label="Design tokens" active={path === `/brands/${b}/tokens`} />
             {onTokens && (

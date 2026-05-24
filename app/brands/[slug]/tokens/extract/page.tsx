@@ -3,6 +3,7 @@ import { getBrandBySlug } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import { ExtractForm } from "./form";
 import { claudeStatus } from "@/lib/agents/adapters/claude";
+import { TokenSubNav } from "@/components/token-subnav";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function ExtractPage({ params }: { params: Promise<{ slug: 
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-5xl mx-auto space-y-10">
+      <TokenSubNav slug={brand.slug} active="extract" />
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
           <Eyebrow>{brand.name} · token extraction</Eyebrow>

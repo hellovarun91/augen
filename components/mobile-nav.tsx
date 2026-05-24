@@ -33,6 +33,7 @@ export function MobileNav({
   const manageNav = activeBrand
     ? [
         { href: `/brands/${activeBrand.slug}`, label: "Overview" },
+        { href: `/brands/${activeBrand.slug}/identity`, label: "Identity" },
         { href: `/brands/${activeBrand.slug}/language`, label: "Language" },
         { href: `/brands/${activeBrand.slug}/tokens`, label: "Design tokens" },
         { href: `/brands/${activeBrand.slug}/tokens/extract`, label: "Extract from artwork" },

@@ -39,6 +39,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
           </div>
           <div className="flex flex-col items-end gap-3">
             <div className="flex gap-2">
+              <LinkButton href={`/brands/${brand.slug}/identity`} variant="secondary" size="sm">Edit identity</LinkButton>
               <LinkButton href={`/brands/${brand.slug}/plan`} variant="secondary" size="sm">Plan a quarter</LinkButton>
               <LinkButton href="/campaigns" variant="secondary" size="sm">Open Studio</LinkButton>
             </div>
@@ -116,7 +117,11 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
         )}
       </Section>
 
-      <Section title="Sample creative" subtitle="Drafted with placeholder copy — to test the token system across the format catalog.">
+      <Section
+        title="Sample creative"
+        subtitle="Drafted with placeholder copy — to test the token system across the format catalog."
+        action={<LinkButton href={`/brands/${brand.slug}/tokens`} variant="ghost" size="sm">Edit design tokens →</LinkButton>}
+      >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           {previewFormats.map((fs) => {
             const f = formatBySlug(fs)!;
@@ -142,7 +147,11 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
         </div>
       </Section>
 
-      <Section title="Voice notes">
+      <Section
+        title="Voice notes"
+        subtitle="What the copywriter listens to. Sharpen the rules and the copy sharpens with it."
+        action={<LinkButton href={`/brands/${brand.slug}/language`} variant="ghost" size="sm">Edit voice & rules →</LinkButton>}
+      >
         <Card className="p-6 grid md:grid-cols-3 gap-6">
           <div>
             <Eyebrow>Description</Eyebrow>

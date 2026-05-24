@@ -3,6 +3,7 @@ import { getBrandBySlug, getBrandFigmaUrl } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import { FigmaSyncForm } from "./form";
 import { figmaStatus } from "@/lib/images/providers";
+import { TokenSubNav } from "@/components/token-subnav";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export default async function FigmaPage({ params }: { params: Promise<{ slug: st
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-5xl mx-auto space-y-10">
+      <TokenSubNav slug={brand.slug} active="figma" />
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
           <Eyebrow>{brand.name} · Figma sync</Eyebrow>

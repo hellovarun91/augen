@@ -2,6 +2,7 @@ import { Card, Eyebrow, Section, Badge } from "@/components/ui/primitives";
 import { getBrandBySlug } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import { TokensEditor } from "./editor";
+import { TokenSubNav } from "@/components/token-subnav";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function TokensPage({ params }: { params: Promise<{ slug: s
   if (!brand) notFound();
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-10">
+      <TokenSubNav slug={brand.slug} active="editor" />
       <div className="flex items-start justify-between gap-6">
         <div>
           <Eyebrow>{brand.name} · token system v{brand.tokens.semver}</Eyebrow>
