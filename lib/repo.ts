@@ -473,10 +473,11 @@ export function setProjectCopySchema(campaignId: string, schema: CopySchema) {
 export interface CopyRow {
   id: string; campaign_id: string; brand_id: string;
   values: Record<string, string>; status: string; order_idx: number; created_at: number;
+  generation_id: string | null;
 }
 
 function hydrateCopyRow(r: any): CopyRow {
-  return { ...r, values: r.values_json ? JSON.parse(r.values_json) : {} };
+  return { ...r, values: r.values_json ? JSON.parse(r.values_json) : {}, generation_id: r.generation_id ?? null };
 }
 
 export function listCopyRows(campaignId: string): CopyRow[] {
@@ -501,6 +502,16 @@ export function updateCopyRow(id: string, patch: { values?: Record<string, strin
 
 export function deleteCopyRow(id: string) {
   db().prepare("DELETE FROM copy_rows WHERE id = ?").run(id);
+}
+
+export function getCopyRow(id: string): CopyRow | null {
+  const r = db().prepare("SELECT * FROM copy_rows WHERE id = ?").get(id) as any;
+  return r ? hydrateCopyRow(r) : null;
+}
+
+// Link (or unlink, with null) a copy row to a specific creative.
+export function linkCopyRow(id: string, generationId: string | null) {
+  db().prepare("UPDATE copy_rows SET generation_id = ? WHERE id = ?").run(generationId, id);
 }
 
 // ---------- Comments & @mentions ----------

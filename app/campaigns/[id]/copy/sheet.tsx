@@ -2,20 +2,42 @@
 import { Button, Eyebrow } from "@/components/ui/primitives";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { CopySchema, CopyColumn } from "@/lib/copy-schema";
 import { classifyLabel } from "@/lib/copy-schema";
 import type { CopyRow } from "@/lib/repo";
-import { addRowAction, updateRowAction, deleteRowAction, saveColumnsAction } from "./actions";
+import {
+  addRowAction, updateRowAction, deleteRowAction, saveColumnsAction,
+  setRowStatusAction, linkRowAction, pullFromCreativeAction, pushToCreativeAction, approveAndPushAction,
+} from "./actions";
 
-export function CopySheet({ campaignId, slug, schema, initialRows }: {
-  campaignId: string; slug: string; schema: CopySchema; initialRows: CopyRow[];
+interface GenOption { id: string; label: string }
+interface RowState { id: string; values: Record<string, string>; status: string; generationId: string | null; note?: string }
+
+const STATUS_TONE: Record<string, string> = {
+  draft: "bg-white/5 text-ink-300 ring-white/10",
+  proof: "bg-amber-400/10 text-amber-200 ring-amber-400/20",
+  approved: "bg-emerald-400/10 text-emerald-200 ring-emerald-400/20",
+};
+
+export function CopySheet({ campaignId, slug, schema, initialRows, generations }: {
+  campaignId: string; slug: string; schema: CopySchema; initialRows: CopyRow[]; generations: GenOption[];
 }) {
   const [columns, setColumns] = useState<CopyColumn[]>(schema.columns);
-  const [rows, setRows] = useState(initialRows.map((r) => ({ id: r.id, values: { ...r.values }, status: r.status })));
+  const [rows, setRows] = useState<RowState[]>(initialRows.map((r) => ({ id: r.id, values: { ...r.values }, status: r.status, generationId: r.generation_id })));
   const [manageCols, setManageCols] = useState(false);
   const [newCol, setNewCol] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
+
+  const genLabel = (id: string | null) => generations.find((g) => g.id === id)?.label;
+  function patchRow(rowId: string, patch: Partial<RowState>) {
+    setRows((rs) => rs.map((r) => (r.id === rowId ? { ...r, ...patch } : r)));
+  }
+  function flash(rowId: string, note: string) {
+    patchRow(rowId, { note });
+    setTimeout(() => patchRow(rowId, { note: undefined }), 2200);
+  }
 
   function setCell(rowId: string, key: string, val: string) {
     setRows((rs) => rs.map((r) => (r.id === rowId ? { ...r, values: { ...r.values, [key]: val } } : r)));
@@ -25,12 +47,44 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
     start(async () => { await updateRowAction(campaignId, rowId, r.values); });
   }
   function addRow() {
-    start(async () => { await addRowAction(campaignId); router.refresh(); });
+    start(async () => {
+      const id = await addRowAction(campaignId);
+      setRows((rs) => [...rs, { id, values: {}, status: "draft", generationId: null }]);
+    });
   }
   function removeRow(rowId: string) {
     setRows((rs) => rs.filter((r) => r.id !== rowId));
     start(async () => { await deleteRowAction(campaignId, rowId); });
   }
+  function setStatus(rowId: string, status: string) {
+    patchRow(rowId, { status });
+    start(async () => { await setRowStatusAction(campaignId, rowId, status); });
+  }
+  function link(rowId: string, genId: string) {
+    const g = genId || null;
+    patchRow(rowId, { generationId: g });
+    start(async () => { await linkRowAction(campaignId, rowId, g); });
+  }
+  function pull(rowId: string) {
+    start(async () => {
+      try { const values = await pullFromCreativeAction(campaignId, rowId); patchRow(rowId, { values }); flash(rowId, "Pulled from creative"); }
+      catch (e: any) { flash(rowId, e?.message || "Pull failed"); }
+    });
+  }
+  function push(rowId: string) {
+    start(async () => {
+      try { await pushToCreativeAction(campaignId, rowId); flash(rowId, "Pushed to creative ✓"); }
+      catch (e: any) { flash(rowId, e?.message || "Push failed"); }
+    });
+  }
+  function approvePush(rowId: string) {
+    patchRow(rowId, { status: "approved" });
+    start(async () => {
+      try { await approveAndPushAction(campaignId, rowId); flash(rowId, "Approved → sent to design ✓"); }
+      catch (e: any) { flash(rowId, e?.message || "Failed"); }
+    });
+  }
+
   function addColumn() {
     const label = newCol.trim(); if (!label) return;
     const { role, layer, maxChars } = classifyLabel(label);
@@ -47,8 +101,8 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-ink-400">{rows.length} row{rows.length === 1 ? "" : "s"} · {columns.length} columns · inherited from the brand default, tweak here</div>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-xs text-ink-400">{rows.length} row{rows.length === 1 ? "" : "s"} · {columns.length} columns · link a row to a creative, write & proof, then send approved copy to design</div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => setManageCols((v) => !v)}>Columns</Button>
           <Button size="sm" onClick={addRow} disabled={pending}>+ Row</Button>
@@ -84,7 +138,7 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-ink-900/60">
-                <th className="w-8 text-[10px] text-ink-500 font-normal px-2 py-2 sticky left-0 bg-ink-900/60">#</th>
+                <th className="text-left text-[10px] text-ink-500 font-normal px-3 py-2 min-w-[240px] sticky left-0 bg-ink-900/60 z-10">ROW · STATUS · CREATIVE</th>
                 {columns.map((c) => (
                   <th key={c.key} className="text-left px-3 py-2 min-w-[180px] border-l border-white/5">
                     <div className="text-[11px] uppercase tracking-wider text-ink-300">{c.label}</div>
@@ -97,7 +151,38 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
             <tbody>
               {rows.map((r, i) => (
                 <tr key={r.id} className="border-t border-white/5 align-top">
-                  <td className="text-[11px] text-ink-500 px-2 py-2 sticky left-0 bg-ink-950">{i + 1}</td>
+                  <td className="px-3 py-2 sticky left-0 bg-ink-950 z-10 align-top">
+                    <div className="space-y-1.5 min-w-[220px]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-ink-500">#{i + 1}</span>
+                        <select value={r.status} onChange={(e) => setStatus(r.id, e.target.value)}
+                          className={"rounded-full px-2 py-0.5 text-[11px] ring-1 outline-none cursor-pointer " + (STATUS_TONE[r.status] || STATUS_TONE.draft)}>
+                          <option value="draft">Draft</option>
+                          <option value="proof">In proof</option>
+                          <option value="approved">Approved</option>
+                        </select>
+                      </div>
+                      <select value={r.generationId || ""} onChange={(e) => link(r.id, e.target.value)}
+                        className="w-full rounded-md bg-ink-800 px-2 py-1 text-[11px] text-ink-200 ring-1 ring-inset ring-white/10">
+                        <option value="">— link a creative —</option>
+                        {generations.map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+                      </select>
+                      {r.generationId && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button onClick={() => pull(r.id)} disabled={pending} className="text-[11px] rounded-md px-2 py-0.5 ring-1 ring-white/10 text-ink-300 hover:bg-white/5" title="Creative → row">↓ Pull</button>
+                          <button onClick={() => push(r.id)} disabled={pending} className="text-[11px] rounded-md px-2 py-0.5 ring-1 ring-white/10 text-ink-300 hover:bg-white/5" title="Row → creative">↑ Push</button>
+                          <Link href={`/ads/${r.generationId}`} className="text-[11px] text-ink-400 hover:text-white">open ↗</Link>
+                        </div>
+                      )}
+                      {r.status !== "approved" && (
+                        <button onClick={() => approvePush(r.id)} disabled={pending}
+                          className="text-[11px] rounded-md px-2 py-0.5 bg-emerald-400/10 text-emerald-200 ring-1 ring-emerald-400/20 hover:bg-emerald-400/15">
+                          {r.generationId ? "Approve → design" : "Approve"}
+                        </button>
+                      )}
+                      {r.note && <div className="text-[10px] text-ink-400">{r.note}</div>}
+                    </div>
+                  </td>
                   {columns.map((c) => {
                     const v = r.values[c.key] || "";
                     const over = c.maxChars && v.length > c.maxChars;
@@ -115,7 +200,7 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
                       </td>
                     );
                   })}
-                  <td className="px-2 py-2 border-l border-white/5 text-center">
+                  <td className="px-2 py-2 border-l border-white/5 text-center align-top">
                     <button onClick={() => removeRow(r.id)} className="text-ink-500 hover:text-rose-300" title="Delete row">✕</button>
                   </td>
                 </tr>

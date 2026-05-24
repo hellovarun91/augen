@@ -1,8 +1,18 @@
 "use server";
-import { getCampaign, createCopyRow, updateCopyRow, deleteCopyRow, setProjectCopySchema } from "@/lib/repo";
-import { CopySchema } from "@/lib/copy-schema";
+import {
+  getCampaign, createCopyRow, updateCopyRow, deleteCopyRow, setProjectCopySchema,
+  getCopyRow, linkCopyRow, getProjectCopySchema, getGeneration, updateGenerationCopy,
+} from "@/lib/repo";
+import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
 import { requireCampaignAccess } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
+
+// Confirms a row belongs to the project — guards every cross-object sync action.
+function rowInProject(campaignId: string, rowId: string) {
+  const row = getCopyRow(rowId);
+  if (!row || row.campaign_id !== campaignId) throw new Error("Row not in this project.");
+  return row;
+}
 
 export async function addRowAction(campaignId: string) {
   await requireCampaignAccess(campaignId);
@@ -28,5 +38,72 @@ export async function deleteRowAction(campaignId: string, rowId: string) {
 export async function saveColumnsAction(campaignId: string, schema: unknown) {
   await requireCampaignAccess(campaignId);
   setProjectCopySchema(campaignId, CopySchema.parse(schema));
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+}
+
+// ---------- CS4: proof → approve lifecycle ----------
+export async function setRowStatusAction(campaignId: string, rowId: string, status: string) {
+  await requireCampaignAccess(campaignId);
+  rowInProject(campaignId, rowId);
+  if (!(COPY_ROW_STATUSES as readonly string[]).includes(status)) throw new Error("Unknown status.");
+  updateCopyRow(rowId, { status });
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+}
+
+// ---------- CS3: row <-> creative link + bidirectional sync ----------
+export async function linkRowAction(campaignId: string, rowId: string, generationId: string | null) {
+  await requireCampaignAccess(campaignId);
+  rowInProject(campaignId, rowId);
+  if (generationId) {
+    const gen = getGeneration(generationId);
+    if (!gen || gen.campaign_id !== campaignId) throw new Error("That creative isn't in this project.");
+  }
+  linkCopyRow(rowId, generationId);
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+}
+
+// Pull: creative's current copy → the row's layer-mapped cells.
+export async function pullFromCreativeAction(campaignId: string, rowId: string) {
+  await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  if (!row.generation_id) throw new Error("Link a creative first.");
+  const gen = getGeneration(row.generation_id);
+  if (!gen || gen.campaign_id !== campaignId) throw new Error("Linked creative is missing.");
+  const schema = getProjectCopySchema(campaignId);
+  const values = layerCopyToRowValues(schema, row.values, {
+    headline: gen.headline || "", subhead: gen.subhead || "", cta: gen.cta || "", eyebrow: gen.eyebrow || "",
+  });
+  updateCopyRow(rowId, { values });
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+  return values;
+}
+
+// Push (to design): the row's copy → the linked creative's copy layers.
+export async function pushToCreativeAction(campaignId: string, rowId: string) {
+  await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  if (!row.generation_id) throw new Error("Link a creative first.");
+  const gen = getGeneration(row.generation_id);
+  if (!gen || gen.campaign_id !== campaignId) throw new Error("Linked creative is missing.");
+  const schema = getProjectCopySchema(campaignId);
+  const copy = rowToLayerCopy(schema, row.values);
+  updateGenerationCopy(row.generation_id, copy);
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+  revalidatePath(`/ads/${row.generation_id}`);
+}
+
+// Approve & send to design in one step: mark approved, then push if linked.
+export async function approveAndPushAction(campaignId: string, rowId: string) {
+  await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  updateCopyRow(rowId, { status: "approved" });
+  if (row.generation_id) {
+    const gen = getGeneration(row.generation_id);
+    if (gen && gen.campaign_id === campaignId) {
+      const schema = getProjectCopySchema(campaignId);
+      updateGenerationCopy(row.generation_id, rowToLayerCopy(schema, row.values));
+      revalidatePath(`/ads/${row.generation_id}`);
+    }
+  }
   revalidatePath(`/campaigns/${campaignId}/copy`);
 }

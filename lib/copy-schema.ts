@@ -110,3 +110,35 @@ export function parseSchemaFromDoc(text: string): CopySchema {
   if (!cols.length) return defaultCopySchema();
   return { columns: cols.slice(0, 16), regions: Array.from(regions).slice(0, 8) };
 }
+
+// ---------- Row <-> creative mapping (CS3) ----------
+// The composer renders four copy layers. These helpers translate between a
+// sheet row's free-form cells and those layers via each column's `layer`.
+
+export type LayerCopy = { headline: string; subhead: string; cta: string; eyebrow: string };
+
+// First column mapped to each layer wins. Lets a row drive a creative's copy.
+export function rowToLayerCopy(schema: CopySchema, values: Record<string, string>): LayerCopy {
+  const pick = (layer: CopyColumn["layer"]) => {
+    const col = schema.columns.find((c) => c.layer === layer);
+    return col ? (values[col.key] || "").trim() : "";
+  };
+  return { headline: pick("headline"), subhead: pick("subhead"), cta: pick("cta"), eyebrow: pick("eyebrow") };
+}
+
+// Writes a creative's current copy back into the layer-mapped cells of a row,
+// preserving any non-layer columns (offers, notes, per-region variants).
+export function layerCopyToRowValues(schema: CopySchema, current: Record<string, string>, copy: LayerCopy): Record<string, string> {
+  const next = { ...current };
+  for (const c of schema.columns) {
+    if (c.layer === "headline") next[c.key] = copy.headline;
+    else if (c.layer === "subhead") next[c.key] = copy.subhead;
+    else if (c.layer === "cta") next[c.key] = copy.cta;
+    else if (c.layer === "eyebrow") next[c.key] = copy.eyebrow;
+  }
+  return next;
+}
+
+export const COPY_ROW_STATUSES = ["draft", "proof", "approved"] as const;
+export type CopyRowStatus = (typeof COPY_ROW_STATUSES)[number];
+export const copyRowStatusLabel = (s: string) => s === "proof" ? "In proof" : s === "approved" ? "Approved" : "Draft";

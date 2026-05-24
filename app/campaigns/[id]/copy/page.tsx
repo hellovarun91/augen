@@ -1,5 +1,6 @@
 import { Eyebrow } from "@/components/ui/primitives";
-import { getCampaign, getBrand, getProjectCopySchema, listCopyRows } from "@/lib/repo";
+import { getCampaign, getBrand, getProjectCopySchema, listCopyRows, listGenerationsByCampaign } from "@/lib/repo";
+import { formatBySlug } from "@/lib/formats";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
@@ -15,6 +16,11 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
   if (!brand) notFound();
   const schema = getProjectCopySchema(campaign.id);
   const rows = listCopyRows(campaign.id);
+  const generations = listGenerationsByCampaign(campaign.id).map((g) => {
+    const f = formatBySlug(g.format_slug);
+    const hl = (g.headline || "").replace(/\s+/g, " ").trim().slice(0, 28);
+    return { id: g.id, label: `${f?.name || g.format_slug}${hl ? ` · "${hl}"` : ""}` };
+  });
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-[1400px] mx-auto space-y-6">
@@ -31,7 +37,7 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
         <Link href={`/brands/${brand.slug}/copy`} className="text-xs text-ink-300 hover:text-white whitespace-nowrap">Edit brand default columns →</Link>
       </div>
 
-      <CopySheet campaignId={campaign.id} slug={brand.slug} schema={schema} initialRows={rows} />
+      <CopySheet campaignId={campaign.id} slug={brand.slug} schema={schema} initialRows={rows} generations={generations} />
     </div>
   );
 }
