@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/app/signin/actions";
 
@@ -17,12 +17,20 @@ export function SidebarNav({
   const path = usePathname() || "/";
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const b = contextBrand?.slug;
+  // Resolve the brand the menu scopes to from the URL on the client, since the
+  // server-rendered layout doesn't re-run on soft navigation. We remember the
+  // last brand we were in so brand-scoped pages without a slug in the URL
+  // (Projects, Review) keep the menu in place.
+  const pathSlug = (() => { const m = path.match(/^\/brands\/([^/]+)/); return m && m[1] !== "new" ? m[1] : null; })();
+  const [stickySlug, setStickySlug] = useState<string | null>(contextBrand?.slug ?? null);
+  useEffect(() => { if (pathSlug) setStickySlug(pathSlug); }, [pathSlug]);
+  const inBrand = !!pathSlug || path.startsWith("/campaigns") || path.startsWith("/ads/") || path.startsWith("/review");
+  const b = inBrand ? (pathSlug || stickySlug || contextBrand?.slug || null) : null;
   const onTokens = !!b && (path.startsWith(`/brands/${b}/tokens`) || path.startsWith(`/brands/${b}/figma`));
 
   return (
     <div className="flex-1 flex flex-col">
-      {contextBrand ? (
+      {b ? (
         <>
           <div className="px-4 pt-1 pb-2">
             <Link href="/" className="text-[11px] text-ink-400 hover:text-ink-100 transition-colors">← All brands</Link>
@@ -31,7 +39,7 @@ export function SidebarNav({
           <Section label="Manage Brand">
             <NavItem href={`/brands/${b}`} label="Overview" active={path === `/brands/${b}`} />
             <NavItem href={`/brands/${b}/identity`} label="Identity" active={path.startsWith(`/brands/${b}/identity`)} />
-            <NavItem href={`/brands/${b}/language`} label="Language" active={path.startsWith(`/brands/${b}/language`)} />
+            <NavItem href={`/brands/${b}/language`} label="Voice" active={path.startsWith(`/brands/${b}/language`)} />
             <NavItem href={`/brands/${b}/tokens`} label="Design tokens" active={path === `/brands/${b}/tokens`} />
             {onTokens && (
               <>

@@ -30,22 +30,30 @@ export function MobileNav({
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  const manageNav = activeBrand
+  // Resolve the brand from the URL on the client (the server layout doesn't
+  // re-run on soft navigation); remember the last brand for slug-less pages.
+  const pathSlug = (() => { const m = path.match(/^\/brands\/([^/]+)/); return m && m[1] !== "new" ? m[1] : null; })();
+  const [stickySlug, setStickySlug] = useState<string | null>(activeBrand?.slug ?? null);
+  useEffect(() => { if (pathSlug) setStickySlug(pathSlug); }, [pathSlug]);
+  const inBrand = !!pathSlug || path.startsWith("/campaigns") || path.startsWith("/ads/") || path.startsWith("/review");
+  const b = inBrand ? (pathSlug || stickySlug || activeBrand?.slug || null) : null;
+
+  const manageNav = b
     ? [
-        { href: `/brands/${activeBrand.slug}`, label: "Overview" },
-        { href: `/brands/${activeBrand.slug}/identity`, label: "Identity" },
-        { href: `/brands/${activeBrand.slug}/language`, label: "Language" },
-        { href: `/brands/${activeBrand.slug}/tokens`, label: "Design tokens" },
-        { href: `/brands/${activeBrand.slug}/tokens/extract`, label: "Extract from artwork" },
-        { href: `/brands/${activeBrand.slug}/figma`, label: "Figma sync" },
-        { href: `/brands/${activeBrand.slug}/references`, label: "References" },
-        { href: `/brands/${activeBrand.slug}/winners`, label: "Winners" },
+        { href: `/brands/${b}`, label: "Overview" },
+        { href: `/brands/${b}/identity`, label: "Identity" },
+        { href: `/brands/${b}/language`, label: "Voice" },
+        { href: `/brands/${b}/tokens`, label: "Design tokens" },
+        { href: `/brands/${b}/tokens/extract`, label: "Extract from artwork" },
+        { href: `/brands/${b}/figma`, label: "Figma sync" },
+        { href: `/brands/${b}/references`, label: "References" },
+        { href: `/brands/${b}/winners`, label: "Winners" },
       ]
     : [];
 
-  const studioNav = activeBrand
+  const studioNav = b
     ? [
-        { href: `/brands/${activeBrand.slug}/plan`, label: "Plan a quarter" },
+        { href: `/brands/${b}/plan`, label: "Plan a quarter" },
         { href: "/campaigns", label: "Projects" },
         { href: "/review", label: "Review" },
       ]
@@ -121,13 +129,13 @@ export function MobileNav({
               </div>
             )}
 
-            {activeBrand ? (
+            {b ? (
               <>
                 <div className="px-4 pt-2">
                   <Link href="/" className="text-[11px] text-ink-400">← All brands</Link>
                 </div>
                 <NavSection label="Manage Brand">
-                  {manageNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href || (n.href !== `/brands/${activeBrand.slug}` && path.startsWith(n.href))} />)}
+                  {manageNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href || (n.href !== `/brands/${b}` && path.startsWith(n.href))} />)}
                 </NavSection>
                 <NavSection label="Studio">
                   {studioNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href || path.startsWith(n.href + "/")} />)}

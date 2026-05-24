@@ -1,10 +1,8 @@
 import "./globals.css";
 import { Sidebar } from "@/components/sidebar";
 import { MobileNav } from "@/components/mobile-nav";
-import { AppHeader } from "@/components/app-header";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { getChromeContext } from "@/lib/chrome";
-import { getAppNav } from "@/lib/nav";
 import { isAdmin } from "@/lib/admin";
 import type { Metadata, Viewport } from "next";
 
@@ -21,7 +19,6 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { user, brands, contextBrand } = await getChromeContext();
-  const nav = await getAppNav();
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-ink-950 text-ink-100">
@@ -35,7 +32,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <div className="flex">
           <Sidebar />
           <main className="flex-1 min-h-screen min-w-0">
-            <AppHeader nav={nav} />
             {children}
           </main>
         </div>

@@ -8,7 +8,7 @@ export async function Sidebar() {
   const { user, brands, contextBrand } = await getChromeContext();
   const admin = isAdmin(user);
   return (
-    <aside className="hidden md:flex md:flex-col w-64 border-r border-white/5 bg-ink-950/70 backdrop-blur-md min-h-screen sticky top-0">
+    <aside className="hidden md:flex md:flex-col w-64 shrink-0 self-start sticky top-0 h-screen overflow-y-auto border-r border-white/5 bg-ink-950/70 backdrop-blur-md">
       <Link href="/" className="px-5 py-5 block">
         <div className="flex items-baseline gap-2">
           <span className="serif text-2xl tracking-tight">Augen</span>

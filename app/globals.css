@@ -33,6 +33,69 @@ html, body {
 input, textarea, select, button { font-family: inherit; color: inherit; }
 input:focus, textarea:focus, select:focus { outline: none; }
 
+/* Premium range slider — the track is the input's (inline) gradient background;
+   the thumb floats over it with a soft shadow and a tactile hover/active scale. */
+.aug-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; border-radius: 9999px;
+  cursor: pointer;
+}
+.aug-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; border: 2px solid #0A0A0B;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.55);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.aug-slider::-webkit-slider-thumb:hover { transform: scale(1.18); }
+.aug-slider:active::-webkit-slider-thumb { transform: scale(1.06); box-shadow: 0 1px 7px rgba(0,0,0,0.7); }
+.aug-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(255,255,255,0.18); }
+.aug-slider::-moz-range-track { background: transparent; height: 6px; border-radius: 9999px; }
+.aug-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; border: 2px solid #0A0A0B;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.55);
+  transition: transform .12s ease;
+}
+.aug-slider::-moz-range-thumb:hover { transform: scale(1.18); }
+
+/* Select dropdowns — custom chevron with breathing room from the right edge.
+   :not([multiple]) keeps specificity above Tailwind's px-* so the right padding
+   (room for the chevron) always wins. */
+select:not([multiple]) {
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239A9AA8' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 15px 15px;
+  padding-right: 2.25rem;
+}
+select:not([multiple]):hover {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23E7E7EC' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* Checkboxes — custom premium box with a crisp check */
+input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none;
+  width: 1.05rem; height: 1.05rem; border-radius: 0.35rem;
+  border: 1.5px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.04);
+  cursor: pointer; flex-shrink: 0;
+  display: inline-grid; place-content: center;
+  vertical-align: middle;
+  transition: background .12s ease, border-color .12s ease;
+}
+input[type="checkbox"]::after {
+  content: ""; width: 0.6rem; height: 0.6rem;
+  transform: scale(0); transition: transform .12s ease;
+  background: #0A0A0B;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+input[type="checkbox"]:hover { border-color: rgba(255,255,255,0.45); }
+input[type="checkbox"]:checked { background: #fff; border-color: #fff; }
+input[type="checkbox"]:checked::after { transform: scale(1); }
+input[type="checkbox"]:focus-visible { box-shadow: 0 0 0 3px rgba(255,255,255,0.18); }
+
 /* Editorial type rule */
 .eyebrow {
   font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;

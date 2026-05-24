@@ -4,6 +4,7 @@ import type { Brand, BrandTokens } from "@/lib/types";
 import { useState, useTransition } from "react";
 import { saveTokens } from "./actions";
 import { AdPreviewPreview } from "@/components/ad-preview";
+import { Slider } from "@/components/ui/slider";
 
 export function TokensEditor({ brand }: { brand: Brand }) {
   const [tokens, setTokens] = useState<BrandTokens>(brand.tokens);
@@ -131,24 +132,16 @@ export function TokensEditor({ brand }: { brand: Brand }) {
 
         <Card className="p-6">
           <Eyebrow>Scrim & locker</Eyebrow>
-          <div className="grid grid-cols-2 gap-3 mt-4">
+          <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="space-y-1.5">
-              <Label>Bottom opacity ({tokens.scrim.bottomOpacity.toFixed(2)})</Label>
-              <input
-                type="range" min="0" max="1" step="0.05"
-                value={tokens.scrim.bottomOpacity}
-                onChange={(e) => patchScrim("bottomOpacity", parseFloat(e.target.value))}
-                className="w-full"
-              />
+              <Label>Bottom opacity</Label>
+              <Slider value={tokens.scrim.bottomOpacity} min={0} max={1} step={0.05} ariaLabel="Bottom opacity"
+                onChange={(v) => patchScrim("bottomOpacity", v)} />
             </div>
             <div className="space-y-1.5">
-              <Label>Coverage ({tokens.scrim.coverage.toFixed(2)})</Label>
-              <input
-                type="range" min="0.2" max="1" step="0.05"
-                value={tokens.scrim.coverage}
-                onChange={(e) => patchScrim("coverage", parseFloat(e.target.value))}
-                className="w-full"
-              />
+              <Label>Coverage</Label>
+              <Slider value={tokens.scrim.coverage} min={0.2} max={1} step={0.05} ariaLabel="Coverage"
+                onChange={(v) => patchScrim("coverage", v)} />
             </div>
             <div className="space-y-1.5 col-span-2">
               <Label>Locker wordmark</Label>

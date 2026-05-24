@@ -227,10 +227,18 @@ function Section({ title, isOpen, onToggle, children }: { title: string; isOpen:
 }
 
 function Slider({ label, value, onChange, min, max, step }: { label: string; value: number; onChange: (v: number) => void; min: number; max: number; step: number }) {
+  const pct = ((value - min) / (max - min)) * 100;
   return (
     <div>
-      <div className="text-[11px] text-ink-300 mb-1">{label}</div>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} className="w-full" />
+      <div className="flex items-center justify-between text-[11px] text-ink-300 mb-1.5">
+        <span>{label}</span><span className="text-ink-500 tabular-nums">{value.toFixed(2)}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="aug-slider"
+        style={{ background: `linear-gradient(to right, rgba(255,255,255,0.85) ${pct}%, rgba(255,255,255,0.10) ${pct}%)` }}
+      />
     </div>
   );
 }

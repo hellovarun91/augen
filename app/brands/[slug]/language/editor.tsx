@@ -4,6 +4,7 @@ import type { Brand, BrandLanguage } from "@/lib/types";
 import { useState, useTransition } from "react";
 import { saveLanguage, criticPreview } from "./actions";
 import { AdPreviewPreview } from "@/components/ad-preview";
+import { Slider } from "@/components/ui/slider";
 
 const SLIDERS: Array<{ key: keyof BrandLanguage["toneSliders"]; left: string; right: string }> = [
   { key: "formal_casual", left: "Formal", right: "Casual" },
@@ -110,15 +111,11 @@ export function LanguageEditor({ brand }: { brand: Brand }) {
             placeholder="A short paragraph describing how the brand sounds — register, rhythm, what it would never say." />
         </Card>
 
-        <Card className="p-6 space-y-4">
+        <Card className="p-6 space-y-5">
           <Eyebrow>Tone</Eyebrow>
           {SLIDERS.map((s) => (
-            <div key={s.key}>
-              <div className="flex items-center justify-between text-xs text-ink-300">
-                <span>{s.left}</span><span className="text-ink-500">{lang.toneSliders[s.key].toFixed(2)}</span><span>{s.right}</span>
-              </div>
-              <input type="range" min="-1" max="1" step="0.05" value={lang.toneSliders[s.key]} onChange={(e) => patchSlider(s.key, parseFloat(e.target.value))} className="w-full" />
-            </div>
+            <Slider key={s.key} value={lang.toneSliders[s.key]} min={-1} max={1} step={0.05} bipolar
+              leftLabel={s.left} rightLabel={s.right} onChange={(v) => patchSlider(s.key, v)} />
           ))}
         </Card>
 
@@ -157,9 +154,9 @@ export function LanguageEditor({ brand }: { brand: Brand }) {
           <Eyebrow>Do / Don't</Eyebrow>
           <div className="grid md:grid-cols-2 gap-4">
             <Listy title="Do" hint="Behaviors copy should embody." items={lang.doRules} draft={draft.do_}
-              setDraft={(v) => setDraft({ ...draft, do_: v })} onAdd={() => addTo("doRules", draft.do_, "do_")} onRemove={(i) => removeFrom("doRules", i)} tone="ok" placeholder="e.g. lead with the benefit" stacked />
+              setDraft={(v) => setDraft({ ...draft, do_: v })} onAdd={() => addTo("doRules", draft.do_, "do_")} onRemove={(i) => removeFrom("doRules", i)} tone="ok" placeholder="e.g. lead with the benefit" />
             <Listy title="Don't" hint="Behaviors to avoid." items={lang.doNotRules} draft={draft.dont}
-              setDraft={(v) => setDraft({ ...draft, dont: v })} onAdd={() => addTo("doNotRules", draft.dont, "dont")} onRemove={(i) => removeFrom("doNotRules", i)} tone="danger" placeholder="e.g. manufactured urgency" stacked />
+              setDraft={(v) => setDraft({ ...draft, dont: v })} onAdd={() => addTo("doNotRules", draft.dont, "dont")} onRemove={(i) => removeFrom("doNotRules", i)} tone="danger" placeholder="e.g. manufactured urgency" />
           </div>
         </Card>
 
@@ -192,7 +189,7 @@ export function LanguageEditor({ brand }: { brand: Brand }) {
           <div className="grid md:grid-cols-2 gap-4">
             {SLOTS.map((s) => (
               <Listy key={s.key} title={s.label} hint="" items={lang.exemplars[s.key]} draft={draft[s.key] as string}
-                setDraft={(v) => setDraft({ ...draft, [s.key]: v })} onAdd={() => addExemplar(s.key, s.key)} onRemove={(i) => removeExemplar(s.key, i)} tone="neutral" placeholder={s.placeholder} stacked />
+                setDraft={(v) => setDraft({ ...draft, [s.key]: v })} onAdd={() => addExemplar(s.key, s.key)} onRemove={(i) => removeExemplar(s.key, i)} tone="neutral" placeholder={s.placeholder} />
             ))}
           </div>
         </Card>
@@ -273,6 +270,37 @@ function Listy({
     danger: "bg-rose-500/10 text-rose-200 ring-rose-500/25",
     neutral: "bg-white/5 text-ink-200 ring-white/10",
   } as const;
+
+  if (!stacked) {
+    // Compact tag input: chips and the field share one bordered box, wrap, and
+    // scroll past a capped height so a long lexicon never runs away vertically.
+    return (
+      <div className="space-y-1.5">
+        {title && <div className="text-sm text-ink-100">{title}</div>}
+        {hint && <div className="text-[11px] text-ink-400">{hint}</div>}
+        <div className="flex flex-wrap items-center gap-1.5 rounded-lg ring-1 ring-white/10 bg-ink-900/40 px-2 py-1.5 max-h-28 overflow-y-auto focus-within:ring-white/25 transition-shadow">
+          {items.map((s, i) => (
+            <span key={i} className={"inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] ring-1 " + colorMap[tone]}>
+              <span className="whitespace-pre-wrap">{s}</span>
+              <button type="button" onClick={() => onRemove(i)} className="text-ink-300 hover:text-white leading-none shrink-0">×</button>
+            </span>
+          ))}
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") { e.preventDefault(); onAdd(); }
+              else if (e.key === "Backspace" && !draft && items.length) { onRemove(items.length - 1); }
+            }}
+            onBlur={() => { if (draft.trim()) onAdd(); }}
+            placeholder={items.length ? "Add…" : placeholder}
+            className="flex-1 min-w-[90px] bg-transparent text-sm px-1 py-0.5 outline-none placeholder:text-ink-500"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       {title && <div className="text-sm text-ink-100">{title}</div>}
@@ -283,23 +311,15 @@ function Listy({
       </div>
       {items.length === 0 ? (
         <div className="text-[11px] text-ink-500">— empty —</div>
-      ) : stacked ? (
-        <ul className="space-y-1.5">
+      ) : (
+        <ul className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
           {items.map((s, i) => (
-            <li key={i} className={"rounded-md px-3 py-1.5 text-sm ring-1 flex items-center justify-between " + colorMap[tone]}>
+            <li key={i} className={"rounded-md px-3 py-1.5 text-sm ring-1 flex items-start justify-between gap-2 " + colorMap[tone]}>
               <span className="whitespace-pre-wrap">{s}</span>
-              <button onClick={() => onRemove(i)} className="text-[11px] text-ink-300 hover:text-white shrink-0 ml-2">✕</button>
+              <button type="button" onClick={() => onRemove(i)} className="text-[11px] text-ink-300 hover:text-white shrink-0 leading-5">✕</button>
             </li>
           ))}
         </ul>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {items.map((s, i) => (
-            <span key={i} className={"inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs ring-1 " + colorMap[tone]}>
-              {s}<button onClick={() => onRemove(i)} className="text-ink-300 hover:text-white">✕</button>
-            </span>
-          ))}
-        </div>
       )}
     </div>
   );
