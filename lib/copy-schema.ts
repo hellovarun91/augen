@@ -117,25 +117,45 @@ export function parseSchemaFromDoc(text: string): CopySchema {
 
 export type LayerCopy = { headline: string; subhead: string; cta: string; eyebrow: string };
 
+// A per-region column stores one value per region under a suffixed key; a normal
+// column stores a single value under its bare key. These two helpers are the only
+// place that encoding lives.
+export function regionCellKey(colKey: string, region: string): string {
+  return `${colKey}::${region}`;
+}
+export function cellValue(col: CopyColumn, values: Record<string, string>, region?: string): string {
+  if (col.perRegion && region) return values[regionCellKey(col.key, region)] || "";
+  return values[col.key] || "";
+}
+
 // First column mapped to each layer wins. Lets a row drive a creative's copy.
-export function rowToLayerCopy(schema: CopySchema, values: Record<string, string>): LayerCopy {
+// For a per-region layer column, uses the given region (or the first region).
+export function rowToLayerCopy(schema: CopySchema, values: Record<string, string>, region?: string): LayerCopy {
   const pick = (layer: CopyColumn["layer"]) => {
     const col = schema.columns.find((c) => c.layer === layer);
-    return col ? (values[col.key] || "").trim() : "";
+    if (!col) return "";
+    const reg = region || schema.regions[0];
+    if (col.perRegion && reg) return (values[regionCellKey(col.key, reg)] || "").trim();
+    return (values[col.key] || "").trim();
   };
   return { headline: pick("headline"), subhead: pick("subhead"), cta: pick("cta"), eyebrow: pick("eyebrow") };
 }
 
 // Writes a creative's current copy back into the layer-mapped cells of a row,
-// preserving any non-layer columns (offers, notes, per-region variants).
-export function layerCopyToRowValues(schema: CopySchema, current: Record<string, string>, copy: LayerCopy): Record<string, string> {
+// preserving any non-layer columns (offers, notes, other regions' variants).
+export function layerCopyToRowValues(schema: CopySchema, current: Record<string, string>, copy: LayerCopy, region?: string): Record<string, string> {
   const next = { ...current };
-  for (const c of schema.columns) {
-    if (c.layer === "headline") next[c.key] = copy.headline;
-    else if (c.layer === "subhead") next[c.key] = copy.subhead;
-    else if (c.layer === "cta") next[c.key] = copy.cta;
-    else if (c.layer === "eyebrow") next[c.key] = copy.eyebrow;
-  }
+  const reg = region || schema.regions[0];
+  const set = (layer: CopyColumn["layer"], val: string) => {
+    for (const c of schema.columns.filter((c) => c.layer === layer)) {
+      if (c.perRegion && reg) next[regionCellKey(c.key, reg)] = val;
+      else next[c.key] = val;
+    }
+  };
+  set("headline", copy.headline);
+  set("subhead", copy.subhead);
+  set("cta", copy.cta);
+  set("eyebrow", copy.eyebrow);
   return next;
 }
 

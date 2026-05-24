@@ -56,6 +56,29 @@ describe("copy mapping (CS3)", () => {
   });
 });
 
+describe("per-region cells (#33)", () => {
+  it("regionCellKey encodes column + region", async () => {
+    const { regionCellKey } = await import("@/lib/copy-schema");
+    expect(regionCellKey("headline", "India")).toBe("headline::India");
+  });
+
+  it("rowToLayerCopy reads a per-region column by region (and defaults to the first)", async () => {
+    const { rowToLayerCopy, regionCellKey } = await import("@/lib/copy-schema");
+    const schema = { columns: [{ key: "headline", label: "Headline", role: "headline", layer: "headline", perRegion: true }], regions: ["India", "US"] } as any;
+    const values = { [regionCellKey("headline", "India")]: "नमस्ते", [regionCellKey("headline", "US")]: "Hello" };
+    expect(rowToLayerCopy(schema, values, "US").headline).toBe("Hello");
+    expect(rowToLayerCopy(schema, values).headline).toBe("नमस्ते"); // defaults to first region
+  });
+
+  it("layerCopyToRowValues writes to the region-suffixed key for per-region columns", async () => {
+    const { layerCopyToRowValues, regionCellKey } = await import("@/lib/copy-schema");
+    const schema = { columns: [{ key: "headline", label: "Headline", role: "headline", layer: "headline", perRegion: true }], regions: ["India", "US"] } as any;
+    const next = layerCopyToRowValues(schema, {}, { headline: "Bonjour", subhead: "", cta: "", eyebrow: "" }, "US");
+    expect(next[regionCellKey("headline", "US")]).toBe("Bonjour");
+    expect(next.headline).toBeUndefined(); // bare key not used for per-region
+  });
+});
+
 describe("foundation strength (M-D)", () => {
   it("scores a sparse brand low with actionable gaps", async () => {
     const { foundationStrength } = await import("@/lib/brand-strength");

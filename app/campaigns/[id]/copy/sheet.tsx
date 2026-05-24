@@ -4,12 +4,29 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { CopySchema, CopyColumn } from "@/lib/copy-schema";
-import { classifyLabel } from "@/lib/copy-schema";
+import { classifyLabel, regionCellKey } from "@/lib/copy-schema";
 import type { CopyRow } from "@/lib/repo";
 import {
   addRowAction, updateRowAction, deleteRowAction, saveColumnsAction,
   setRowStatusAction, linkRowAction, pullFromCreativeAction, pushToCreativeAction, approveAndPushAction,
 } from "./actions";
+
+function CellBox({ value, maxChars, onChange, onBlur }: { value: string; maxChars?: number; onChange: (v: string) => void; onBlur: () => void }) {
+  const over = !!maxChars && value.length > maxChars;
+  return (
+    <>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        rows={2}
+        className={"w-full resize-y bg-transparent rounded-md px-2 py-1.5 text-sm text-ink-100 ring-1 ring-inset focus:ring-white/25 " + (over ? "ring-rose-500/40" : "ring-white/10")}
+        placeholder="—"
+      />
+      {maxChars ? <div className={"text-[10px] mt-0.5 " + (over ? "text-rose-300" : "text-ink-500")}>{value.length}/{maxChars}</div> : null}
+    </>
+  );
+}
 
 interface GenOption { id: string; label: string }
 interface RowState { id: string; values: Record<string, string>; status: string; generationId: string | null; note?: string }
@@ -24,11 +41,17 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
   campaignId: string; slug: string; schema: CopySchema; initialRows: CopyRow[]; generations: GenOption[];
 }) {
   const [columns, setColumns] = useState<CopyColumn[]>(schema.columns);
+  const [regions, setRegions] = useState<string[]>(schema.regions);
   const [rows, setRows] = useState<RowState[]>(initialRows.map((r) => ({ id: r.id, values: { ...r.values }, status: r.status, generationId: r.generation_id })));
   const [manageCols, setManageCols] = useState(false);
   const [newCol, setNewCol] = useState("");
+  const [newRegion, setNewRegion] = useState("");
   const [pending, start] = useTransition();
   const router = useRouter();
+
+  function saveSchema(nextCols: CopyColumn[], nextRegions: string[]) {
+    start(async () => { await saveColumnsAction(campaignId, { columns: nextCols, regions: nextRegions }); });
+  }
 
   const genLabel = (id: string | null) => generations.find((g) => g.id === id)?.label;
   function patchRow(rowId: string, patch: Partial<RowState>) {
@@ -39,6 +62,7 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
     setTimeout(() => patchRow(rowId, { note: undefined }), 2200);
   }
 
+  // `key` is the storage key — a bare column key, or a region-suffixed key.
   function setCell(rowId: string, key: string, val: string) {
     setRows((rs) => rs.map((r) => (r.id === rowId ? { ...r, values: { ...r.values, [key]: val } } : r)));
   }
@@ -90,13 +114,24 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
     const { role, layer, maxChars } = classifyLabel(label);
     const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/(^_|_$)/g, "") || `col_${columns.length}`;
     const next = [...columns, { key, label, role, layer, maxChars, perRegion: false } as CopyColumn];
-    setColumns(next); setNewCol("");
-    start(async () => { await saveColumnsAction(campaignId, { columns: next, regions: schema.regions }); });
+    setColumns(next); setNewCol(""); saveSchema(next, regions);
   }
   function removeColumn(key: string) {
     const next = columns.filter((c) => c.key !== key);
-    setColumns(next);
-    start(async () => { await saveColumnsAction(campaignId, { columns: next, regions: schema.regions }); });
+    setColumns(next); saveSchema(next, regions);
+  }
+  function toggleColumnRegion(key: string) {
+    const next = columns.map((c) => (c.key === key ? { ...c, perRegion: !c.perRegion } : c));
+    setColumns(next); saveSchema(next, regions);
+  }
+  function addRegion() {
+    const name = newRegion.trim(); if (!name || regions.includes(name)) { setNewRegion(""); return; }
+    const next = [...regions, name];
+    setRegions(next); setNewRegion(""); saveSchema(columns, next);
+  }
+  function removeRegion(name: string) {
+    const next = regions.filter((r) => r !== name);
+    setRegions(next); saveSchema(columns, next);
   }
 
   return (
@@ -110,20 +145,44 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
       </div>
 
       {manageCols && (
-        <div className="rounded-xl ring-1 ring-white/10 p-3 space-y-2">
-          <Eyebrow>Columns for this project</Eyebrow>
-          <div className="flex flex-wrap gap-1.5">
-            {columns.map((c) => (
-              <span key={c.key} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 ring-white/10 bg-white/5">
-                {c.label}<span className="text-ink-500">· {c.layer === "none" ? c.role : c.layer}</span>
-                <button onClick={() => removeColumn(c.key)} className="text-ink-400 hover:text-rose-300">×</button>
-              </span>
-            ))}
+        <div className="rounded-xl ring-1 ring-white/10 p-3 space-y-4">
+          <div className="space-y-2">
+            <Eyebrow>Columns for this project</Eyebrow>
+            <div className="flex flex-wrap gap-1.5">
+              {columns.map((c) => (
+                <span key={c.key} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 ring-white/10 bg-white/5">
+                  {c.label}<span className="text-ink-500">· {c.layer === "none" ? c.role : c.layer}</span>
+                  <button onClick={() => toggleColumnRegion(c.key)} title="Vary this column per region"
+                    className={"rounded px-1.5 py-0.5 text-[10px] " + (c.perRegion ? "bg-indigo-400/20 text-indigo-200" : "text-ink-500 hover:text-ink-200")}>
+                    per-region
+                  </button>
+                  <button onClick={() => removeColumn(c.key)} className="text-ink-400 hover:text-rose-300">×</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <input value={newCol} onChange={(e) => setNewCol(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColumn(); } }}
+                placeholder="Add a column (e.g. Webinar CTA)" className="flex-1 rounded-lg bg-ink-800 px-3 py-1.5 text-sm ring-1 ring-inset ring-white/10" />
+              <Button size="sm" variant="secondary" onClick={addColumn}>Add</Button>
+            </div>
           </div>
-          <div className="flex gap-2 pt-1">
-            <input value={newCol} onChange={(e) => setNewCol(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addColumn(); } }}
-              placeholder="Add a column (e.g. Webinar CTA)" className="flex-1 rounded-lg bg-ink-800 px-3 py-1.5 text-sm ring-1 ring-inset ring-white/10" />
-            <Button size="sm" variant="secondary" onClick={addColumn}>Add</Button>
+
+          <div className="space-y-2 border-t border-white/5 pt-3">
+            <Eyebrow>Regions / locales</Eyebrow>
+            <div className="text-[11px] text-ink-500">Columns marked “per-region” split into one cell per locale below.</div>
+            <div className="flex flex-wrap gap-1.5">
+              {regions.length === 0 && <span className="text-xs text-ink-500">No regions yet.</span>}
+              {regions.map((rg) => (
+                <span key={rg} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 ring-indigo-400/20 bg-indigo-400/10 text-indigo-100">
+                  {rg}<button onClick={() => removeRegion(rg)} className="text-indigo-200/70 hover:text-rose-300">×</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <input value={newRegion} onChange={(e) => setNewRegion(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRegion(); } }}
+                placeholder="Add a region (e.g. India, US, UK)" className="flex-1 rounded-lg bg-ink-800 px-3 py-1.5 text-sm ring-1 ring-inset ring-white/10" />
+              <Button size="sm" variant="secondary" onClick={addRegion}>Add</Button>
+            </div>
           </div>
         </div>
       )}
@@ -184,19 +243,24 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
                     </div>
                   </td>
                   {columns.map((c) => {
-                    const v = r.values[c.key] || "";
-                    const over = c.maxChars && v.length > c.maxChars;
+                    const perRegion = c.perRegion && regions.length > 0;
                     return (
-                      <td key={c.key} className="px-1.5 py-1.5 border-l border-white/5">
-                        <textarea
-                          value={v}
-                          onChange={(e) => setCell(r.id, c.key, e.target.value)}
-                          onBlur={() => commit(r.id)}
-                          rows={2}
-                          className={"w-full resize-y bg-transparent rounded-md px-2 py-1.5 text-sm text-ink-100 ring-1 ring-inset focus:ring-white/25 " + (over ? "ring-rose-500/40" : "ring-white/10")}
-                          placeholder="—"
-                        />
-                        {c.maxChars && <div className={"text-[10px] mt-0.5 " + (over ? "text-rose-300" : "text-ink-500")}>{v.length}/{c.maxChars}</div>}
+                      <td key={c.key} className="px-1.5 py-1.5 border-l border-white/5 align-top">
+                        {perRegion ? (
+                          <div className="space-y-2">
+                            {regions.map((rg) => {
+                              const key = regionCellKey(c.key, rg);
+                              return (
+                                <div key={rg}>
+                                  <div className="text-[10px] uppercase tracking-wider text-indigo-300/80 mb-0.5">{rg}</div>
+                                  <CellBox value={r.values[key] || ""} maxChars={c.maxChars} onChange={(val) => setCell(r.id, key, val)} onBlur={() => commit(r.id)} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <CellBox value={r.values[c.key] || ""} maxChars={c.maxChars} onChange={(val) => setCell(r.id, c.key, val)} onBlur={() => commit(r.id)} />
+                        )}
                       </td>
                     );
                   })}
