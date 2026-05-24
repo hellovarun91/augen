@@ -27,10 +27,10 @@ export default function NewBrandPage() {
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-5xl mx-auto space-y-10">
       <div>
         <Eyebrow>Onboard a brand</Eyebrow>
-        <h1 className="serif text-display-lg mt-2 tracking-tight">A brief. We do the rest.</h1>
+        <h1 className="serif text-display-lg mt-2 tracking-tight">A brief, or a website. We synthesize the rest.</h1>
         <p className="text-ink-300 mt-2 max-w-2xl">
-          Drop a paragraph that describes the brand — voice, audience, what they sell, what they don't. Augen synthesizes the
-          token system, voice rules, and imagery treatment from that. Editable end-to-end.
+          Describe the brand — or point us at its site — and Augen synthesizes the token system, voice rules, and imagery
+          treatment. You review and tweak the foundation before anything is created. Editable end-to-end.
         </p>
       </div>
 
@@ -38,7 +38,7 @@ export default function NewBrandPage() {
         <NewBrandForm presets={PRESETS} />
       </Card>
 
-      <Section title="What you get on submit">
+      <Section title="What you get when you confirm">
         <ol className="grid md:grid-cols-2 gap-4">
           {[
             ["1.", "A full token system — palette, typography, scrim, voice, imagery treatment."],
