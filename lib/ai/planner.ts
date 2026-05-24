@@ -109,16 +109,19 @@ const FORMATS_DEFAULT = [
   "tiktok-feed-9x16",
 ];
 
-export function planQuarter(brand: Brand, year: number, quarter: "Q1" | "Q2" | "Q3" | "Q4"): PlannedCampaign[] {
+export function planQuarter(brand: Brand, year: number, quarter: "Q1" | "Q2" | "Q3" | "Q4", count = 3): PlannedCampaign[] {
   const seed = hashStr(`${brand.slug}-${year}-${quarter}`);
   const r = rng(seed);
   const season = SEASONAL[quarter];
   const industry = (brand.industry || "lifestyle").toLowerCase();
   const audiences = AUDIENCES_BY_INDUSTRY[industry] || AUDIENCES_BY_INDUSTRY.lifestyle;
 
-  // 3 campaigns per quarter — different objectives.
+  // Default to a 3-beat arc (awareness → consideration → conversion); the
+  // operator can ask for fewer or more, cycling objectives for extra drafts.
   const objectives = ["awareness", "consideration", "conversion"] as const;
-  return objectives.map((obj, i) => {
+  const n = Math.max(1, Math.min(6, Math.round(count)));
+  return Array.from({ length: n }, (_, i) => {
+    const obj = objectives[i % objectives.length];
     const themePicked = pick(season.themes, r);
     const angle = pick(ANGLES, r);
     const audience = pick(audiences, r);

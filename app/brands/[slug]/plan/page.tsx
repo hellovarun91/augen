@@ -18,9 +18,10 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
   const defaultNext = (defaultQ === 4 ? 1 : defaultQ + 1) as 1 | 2 | 3 | 4;
   const year = parseInt(sp.year || `${now.getFullYear()}`, 10);
   const quarter = (sp.q as "Q1" | "Q2" | "Q3" | "Q4") || (`Q${defaultNext}` as "Q1" | "Q2" | "Q3" | "Q4");
+  const count = Math.max(1, Math.min(6, parseInt(sp.count || "3", 10) || 3));
 
   // Money (budget/KPIs/channels) intentionally dropped — the studio stays design-first.
-  const proposals: Proposal[] = planQuarter(brand, year, quarter).map((p, i) => ({
+  const proposals: Proposal[] = planQuarter(brand, year, quarter, count).map((p, i) => ({
     id: String(i),
     name: p.name,
     objective: p.objective,
@@ -42,7 +43,7 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
             you don't want, then add the rest to your Studio. You can always create projects by hand too.
           </p>
         </div>
-        <PlannerControls slug={brand.slug} currentQ={quarter} currentYear={year} />
+        <PlannerControls slug={brand.slug} currentQ={quarter} currentYear={year} currentCount={count} />
       </div>
 
       <PlannerWorkspace brandId={brand.id} proposals={proposals} />
