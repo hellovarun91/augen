@@ -10,11 +10,12 @@ interface Props {
   headline: string;
   overrides: AdOverrides;
   tokens: BrandTokens;
+  assets?: Array<{ id: string; label: string | null; file_path: string; kind: string }>;
   reloadKey: number;
   onReload: () => void;
 }
 
-export function EditPanel({ generationId, headline, overrides, tokens, onReload }: Props) {
+export function EditPanel({ generationId, headline, overrides, tokens, assets = [], onReload }: Props) {
   const [pending, start] = useTransition();
   const [local, setLocal] = useState<AdOverrides>(overrides);
   const [open, setOpen] = useState<string | null>("typography");
@@ -43,6 +44,7 @@ export function EditPanel({ generationId, headline, overrides, tokens, onReload 
           layout: { ctaPosition: "auto", lockerVisible: true, headlineYShift: 0 },
           image: { transparent: false, crop: { panX: 0, panY: 0, scale: 1 }, filter: "none" },
           colors: {},
+          placedAssets: [],
         } as AdOverrides);
         onReload();
       } catch (e: any) { setError(e?.message || "Clear failed"); }
@@ -88,6 +90,14 @@ export function EditPanel({ generationId, headline, overrides, tokens, onReload 
   function setColor(slot: keyof AdOverrides["colors"], v: string) {
     const colors = { ...local.colors, [slot]: v || undefined };
     save({ colors: { [slot]: v || null } }, { ...local, colors });
+  }
+
+  const placed = local.placedAssets || [];
+  function putPlaced(next: typeof placed) { save({ placedAssets: next }, { ...local, placedAssets: next }); }
+  function addPlaced(assetId: string) { putPlaced([...placed, { assetId, x: 0.5, y: 0.5, scale: 0.18 }]); }
+  function removePlaced(idx: number) { putPlaced(placed.filter((_, i) => i !== idx)); }
+  function patchPlaced(idx: number, patch: Partial<{ x: number; y: number; scale: number }>) {
+    putPlaced(placed.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
   }
 
   return (
@@ -210,6 +220,42 @@ export function EditPanel({ generationId, headline, overrides, tokens, onReload 
         <ColorRow label="CTA" value={local.colors.cta || ""} onChange={(v) => setColor("cta", v)} placeholder="auto" />
         <ColorRow label="Rule" value={local.colors.rule || ""} onChange={(v) => setColor("rule", v)} placeholder={tokens.palette.accent} />
       </Section>
+
+      {/* Brand assets */}
+      {assets.length > 0 && (
+        <Section title="Brand assets" isOpen={open === "assets"} onToggle={() => setOpen(open === "assets" ? null : "assets")}>
+          <div className="text-[11px] text-ink-400">Place a logo, icon, or badge on this ad, then size and position it.</div>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {assets.map((a) => (
+              <button key={a.id} onClick={() => addPlaced(a.id)} title={`Add ${a.label || a.kind}`}
+                className="w-12 h-12 rounded-md ring-1 ring-white/10 flex items-center justify-center overflow-hidden hover:ring-white/30" style={{ backgroundColor: "#2c2c30" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={a.file_path} alt={a.label || a.kind} className="max-h-full max-w-full object-contain p-1" />
+              </button>
+            ))}
+          </div>
+          {placed.length > 0 && (
+            <ul className="space-y-3 mt-3 pt-3 border-t border-white/5">
+              {placed.map((p, i) => {
+                const a = assets.find((x) => x.id === p.assetId);
+                return (
+                  <li key={i} className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={a?.file_path} alt="" className="w-6 h-6 object-contain" style={{ backgroundColor: "#2c2c30" }} />
+                      <span className="text-ink-200 truncate">{a?.label || a?.kind || "asset"}</span>
+                      <button onClick={() => removePlaced(i)} className="ml-auto text-ink-400 hover:text-rose-300">✕</button>
+                    </div>
+                    <Slider label={`Size (${Math.round(p.scale * 100)}%)`} value={p.scale} onChange={(v) => patchPlaced(i, { scale: v })} min={0.05} max={0.6} step={0.01} />
+                    <Slider label={`Position X (${Math.round(p.x * 100)}%)`} value={p.x} onChange={(v) => patchPlaced(i, { x: v })} min={0} max={1} step={0.01} />
+                    <Slider label={`Position Y (${Math.round(p.y * 100)}%)`} value={p.y} onChange={(v) => patchPlaced(i, { y: v })} min={0} max={1} step={0.01} />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+      )}
     </Card>
   );
 }

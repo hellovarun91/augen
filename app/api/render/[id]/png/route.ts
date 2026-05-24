@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getBrand, getGeneration, getGenerationOverrides, getReference } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
-import { brandLogo } from "@/lib/composer/logo";
+import { brandLogo, resolvePlacedAssets } from "@/lib/composer/logo";
 import { rasterizeSvg } from "@/lib/composer/rasterize";
 import { db } from "@/lib/db";
 import { parseOverrides } from "@/lib/composer/overrides";
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     seed: gen.image_seed, style: gen.image_style || brand.tokens.imagery.style,
     referenceUrl: effectiveRefUrl, overrides,
     logo: brandLogo(brand.id),
+    placedAssets: resolvePlacedAssets(overrides.placedAssets),
   });
 
   const png = await rasterizeSvg(svg, { width: Math.min(gen.width, 2048), inlineReferences: true });

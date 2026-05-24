@@ -1,5 +1,5 @@
 import { Badge, Eyebrow } from "@/components/ui/primitives";
-import { getBrand, getCampaign, getGeneration, getGenerationOverrides, getIdea } from "@/lib/repo";
+import { getBrand, getCampaign, getGeneration, getGenerationOverrides, getIdea, listAssets } from "@/lib/repo";
 import { formatBySlug } from "@/lib/formats";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -57,6 +57,7 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         overrides={overrides}
         tokens={brand.tokens}
         ideaSummary={idea ? { theme: idea.theme, angle: idea.angle, audience: idea.audience, insight: idea.insight || "" } : null}
+        assets={listAssets(brand.id).map((a) => ({ id: a.id, label: a.label, file_path: a.file_path, kind: a.kind }))}
       />
     </div>
   );

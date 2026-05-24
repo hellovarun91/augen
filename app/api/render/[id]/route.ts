@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getBrand, getGeneration, getGenerationOverrides, getReference } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
-import { brandLogo } from "@/lib/composer/logo";
+import { brandLogo, resolvePlacedAssets } from "@/lib/composer/logo";
 import { db } from "@/lib/db";
 import { parseOverrides } from "@/lib/composer/overrides";
 
@@ -55,6 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     referenceUrl: effectiveRefUrl ? new URL(effectiveRefUrl, req.url).toString() : undefined,
     overrides,
     logo: brandLogo(brand.id),
+    placedAssets: resolvePlacedAssets(overrides.placedAssets),
   });
 
   return new Response(svg, {

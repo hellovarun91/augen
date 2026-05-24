@@ -24,6 +24,9 @@ export interface RenderArgs {
   // Primary brand logo (data-URI) for the locker; inverseHref is the light/
   // knockout variant used on dark backgrounds. Falls back to the text wordmark.
   logo?: { href: string; inverseHref?: string };
+  // Brand assets placed on this ad (data-URIs already resolved). x/y centre and
+  // scale are fractions of the canvas.
+  placedAssets?: Array<{ href: string; x: number; y: number; scale: number }>;
 }
 
 export function renderAdSvg(args: RenderArgs): string {
@@ -70,11 +73,20 @@ export function renderAdSvg(args: RenderArgs): string {
   const lockerLogo = args.logo ? (onLight ? args.logo.href : (args.logo.inverseHref || args.logo.href)) : null;
   const text = buildText(layout, tokens, copy, colors, ov, lockerVisible, lockerLogo);
 
+  // Placed brand assets — an overlay layer above the copy.
+  const placed = (args.placedAssets || []).map((p) => {
+    const box = Math.max(8, Math.round(p.scale * width));
+    const x = Math.round(p.x * width - box / 2);
+    const y = Math.round(p.y * height - box / 2);
+    return `<image x="${x}" y="${y}" width="${box}" height="${box}" preserveAspectRatio="xMidYMid meet" href="${p.href}"/>`;
+  }).join("\n");
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet">
 ${bg}
 ${scrim}
 ${text}
+${placed}
 </svg>`;
 }
 

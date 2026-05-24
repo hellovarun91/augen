@@ -12,6 +12,7 @@ export function AdDetailClient({
   overrides,
   tokens,
   ideaSummary,
+  assets = [],
 }: {
   generation: {
     id: string; width: number; height: number;
@@ -21,6 +22,7 @@ export function AdDetailClient({
   overrides: AdOverrides;
   tokens: BrandTokens;
   ideaSummary: { theme: string; angle: string; audience: string; insight: string } | null;
+  assets?: Array<{ id: string; label: string | null; file_path: string; kind: string }>;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"review" | "edit">("review");
@@ -110,6 +112,7 @@ export function AdDetailClient({
             headline={generation.headline}
             overrides={overrides}
             tokens={tokens}
+            assets={assets}
             reloadKey={bump}
             onReload={onReload}
           />

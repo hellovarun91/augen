@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import JSZip from "jszip";
 import { getBrand, getCampaign, getGenerationOverrides, getReference, listGenerationsByCampaign } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
-import { brandLogo } from "@/lib/composer/logo";
+import { brandLogo, resolvePlacedAssets } from "@/lib/composer/logo";
 import { rasterizeSvg, inlineRefImages } from "@/lib/composer/rasterize";
 import { formatBySlug } from "@/lib/formats";
 import { db } from "@/lib/db";
@@ -74,6 +74,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       referenceUrl: effectiveRefUrl,
       overrides,
       logo: brandLogo(b.id),
+      placedAssets: resolvePlacedAssets(overrides.placedAssets),
     });
     const standaloneSvg = await inlineRefImages(rawSvg);
     fmtFolder.file(`${g.id}.svg`, standaloneSvg);

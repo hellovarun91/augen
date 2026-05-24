@@ -41,6 +41,14 @@ export const AdOverrides = z.object({
     cta: z.string().optional(),
     rule: z.string().optional(),
   }).default({}),
+  // Brand assets (logo/icon/badge) placed on this specific ad. x/y are the
+  // centre as a fraction of canvas; scale is the box size as a fraction of width.
+  placedAssets: z.array(z.object({
+    assetId: z.string(),
+    x: z.number().min(0).max(1).default(0.5),
+    y: z.number().min(0).max(1).default(0.5),
+    scale: z.number().min(0.03).max(0.9).default(0.18),
+  })).default([]),
 });
 export type AdOverrides = z.infer<typeof AdOverrides>;
 
