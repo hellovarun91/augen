@@ -40,7 +40,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
           <div className="flex flex-col items-end gap-3">
             <div className="flex gap-2">
               <LinkButton href={`/brands/${brand.slug}/identity`} variant="secondary" size="sm">Edit identity</LinkButton>
-              <LinkButton href={`/brands/${brand.slug}/plan`} variant="secondary" size="sm">Planner</LinkButton>
+              <LinkButton href={`/brands/${brand.slug}/plan`} variant="secondary" size="sm">AI Planner</LinkButton>
               <LinkButton href="/campaigns" variant="secondary" size="sm">Open Studio</LinkButton>
             </div>
             <div className="flex items-center gap-2">
@@ -91,7 +91,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
             Open the Studio to create one, or let the Planner draft a few to start from.
             <div className="mt-4 flex gap-2 justify-center">
               <LinkButton href="/campaigns">Open Studio →</LinkButton>
-              <LinkButton href={`/brands/${brand.slug}/plan`} variant="ghost">Planner</LinkButton>
+              <LinkButton href={`/brands/${brand.slug}/plan`} variant="ghost">AI Planner</LinkButton>
             </div>
           </Empty>
         ) : (

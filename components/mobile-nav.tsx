@@ -55,7 +55,7 @@ export function MobileNav({
   const projId = (() => { const m = path.match(/^\/campaigns\/([^/]+)/); return m ? m[1] : null; })();
   const studioNav = b
     ? [
-        { href: `/brands/${b}/plan`, label: "Planner" },
+        { href: `/brands/${b}/plan`, label: "AI Planner" },
         { href: "/campaigns", label: "Projects" },
         ...(projId ? [
           { href: `/campaigns/${projId}`, label: "· Overview" },

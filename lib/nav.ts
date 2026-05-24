@@ -16,7 +16,7 @@ const BRAND_SECTIONS: Array<{ seg: string; label: string }> = [
   { seg: "assets", label: "Assets" },
   { seg: "references", label: "References" },
   { seg: "winners", label: "Winners" },
-  { seg: "plan", label: "Planner" },
+  { seg: "plan", label: "AI Planner" },
 ];
 
 export async function getAppNav(): Promise<AppNav> {

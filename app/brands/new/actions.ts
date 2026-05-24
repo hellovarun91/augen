@@ -1,5 +1,5 @@
 "use server";
-import { synthesizeBrand } from "@/lib/ai/brand-builder";
+import { synthesizeBrandAI } from "@/lib/ai/brand-synth";
 import { createBrand, createCampaign, createIdea, getBrandBySlug } from "@/lib/repo";
 import { planQuarter, plannedToBrief } from "@/lib/ai/planner";
 import { slugify } from "@/lib/utils";
@@ -13,7 +13,7 @@ export async function onboardBrand(fd: FormData) {
   const autoDraft = String(fd.get("autoDraft") || "next");
   if (brief.length < 16) throw new Error("Brief is too short — give us a sentence at least.");
 
-  const synth = synthesizeBrand(brief, overrideName ? { name: overrideName, slug: slugify(overrideName) } : undefined);
+  const synth = await synthesizeBrandAI(brief, overrideName ? { name: overrideName, slug: slugify(overrideName) } : undefined);
 
   // De-duplicate slug
   let slug = synth.slug;

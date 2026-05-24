@@ -35,7 +35,7 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
       <SyncActiveBrand brandId={brand.id} />
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
-          <Eyebrow>{brand.name} · planner</Eyebrow>
+          <Eyebrow>{brand.name} · AI planner</Eyebrow>
           <h1 className="serif text-display-lg mt-1 tracking-tight">Draft a few projects</h1>
           <p className="text-ink-300 mt-2 max-w-2xl">
             A starting set for {quarter} {year} — one to build awareness, one to nurture, one to convert. Rename them, drop what

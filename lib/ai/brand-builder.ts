@@ -34,6 +34,7 @@ function inferIndustry(brief: string): string {
     ["skin|skincare|beauty|serum|cosmetic|makeup", "beauty"],
     ["clothes|fashion|apparel|garment|denim", "fashion"],
     ["fintech|bank|invest|stock|crypto|finance", "fintech"],
+    ["school|edtech|learn|tutor|course|university|degree|curriculum", "education"],
     ["saas|software|api|developer|devtool|platform", "saas"],
     ["wellness|supplement|vitamin|nutrition", "wellness"],
     ["hotel|hospitality|restaurant|bar|bistro", "hospitality"],
@@ -41,7 +42,6 @@ function inferIndustry(brief: string): string {
     ["game|gaming|esport", "gaming"],
     ["car|auto|automotive|EV", "automotive"],
     ["health|medical|clinic|patient", "healthcare"],
-    ["school|edtech|learn|tutor|course", "education"],
     ["luxury|spirits|whisky|champagne", "luxury"],
   ];
   for (const [pat, name] of map) {
@@ -112,7 +112,7 @@ export function synthesizeBrand(brief: string, overrides?: { name?: string; slug
   const name = overrides?.name || nameFromBrief(brief);
   const slug = overrides?.slug || slugify(name);
 
-  const tagline = synthesizeTagline(brief, name, voice.name, r);
+  const tagline = synthesizeTagline(brief, name, industry, r);
   const description = synthesizeDescription(brief, name, industry, voice.name);
 
   const tokens: BrandTokens = {
@@ -160,20 +160,29 @@ export function synthesizeBrand(brief: string, overrides?: { name?: string; slug
   return { name, slug, tagline, industry, description, tokens };
 }
 
-function synthesizeTagline(brief: string, name: string, voiceName: string, r: () => number): string {
-  const templates = [
-    `Brewed for the quiet hours.`,
-    `Made by hand. Sold by feel.`,
-    `Small batches. Long memory.`,
-    `For the way you actually live.`,
-    `Less, but properly.`,
-    `Not louder. Better.`,
-    `Built for the second cup.`,
-    `An honest answer to a tired category.`,
-    `Made with intent.`,
-    `The shortest distance between you and good.`,
-  ];
-  return pick(templates, r);
+// Industry-appropriate tagline banks for the deterministic (mock) path, so an
+// edtech brand never gets a coffee tagline. The Claude path writes a real one.
+const TAGLINES_BY_INDUSTRY: Record<string, string[]> = {
+  education: ["Learn without limits.", "Skills that move you forward.", "Built for the curious.", "Your next step, well taught."],
+  saas: ["Less busywork. More work.", "The tool that gets out of the way.", "Built for teams that ship.", "Clarity, by default."],
+  fintech: ["Money, made clear.", "Confidence with every move.", "Your money, working smarter.", "Built on trust."],
+  beauty: ["Skin, considered.", "Less, but better.", "Care that shows.", "The honest glow."],
+  beverage: ["Bright by the sip.", "Made by feel, low on sugar.", "Refreshment, reconsidered.", "Taste the difference."],
+  cafe: ["Brewed for the quiet hours.", "Built for the second cup.", "Small batches. Long memory.", "Made by hand."],
+  fashion: ["Wear it your way.", "Quietly confident.", "Built to last, made to move.", "Style without the noise."],
+  wellness: ["Feel like yourself again.", "Small habits, real change.", "Care you can keep.", "Well, simply."],
+  hospitality: ["Stay a little longer.", "Made for the in-between.", "Where the evening slows.", "Come as you are."],
+  ceramics: ["Made by hand. Built to keep.", "The everyday, elevated.", "Form you'll reach for.", "Quietly made."],
+  gaming: ["Game on your terms.", "Built for the win.", "Play without limits.", "Made for the moment."],
+  automotive: ["Engineered to move you.", "The drive, refined.", "Built for the road ahead.", "Performance, honestly."],
+  healthcare: ["Care, made clear.", "Health you can trust.", "Better, together.", "Your wellbeing, first."],
+  luxury: ["Quietly exceptional.", "Crafted to endure.", "The art of less.", "Made for the few."],
+  lifestyle: ["For the way you actually live.", "Made with intent.", "Not louder. Better.", "An honest upgrade."],
+};
+
+function synthesizeTagline(brief: string, name: string, industry: string, r: () => number): string {
+  const bank = TAGLINES_BY_INDUSTRY[industry] || TAGLINES_BY_INDUSTRY.lifestyle;
+  return pick(bank, r);
 }
 
 function synthesizeDescription(brief: string, name: string, industry: string, voice: string): string {

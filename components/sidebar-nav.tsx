@@ -55,7 +55,7 @@ export function SidebarNav({
           </Section>
 
           <Section label="Studio">
-            <NavItem href={`/brands/${b}/plan`} label="Planner" active={path.startsWith(`/brands/${b}/plan`)} />
+            <NavItem href={`/brands/${b}/plan`} label="AI Planner" active={path.startsWith(`/brands/${b}/plan`)} />
             <NavItem href="/campaigns" label="Projects" active={path === "/campaigns"} />
             {projId && (
               <>
