@@ -1,12 +1,14 @@
 "use server";
 import {
   updateGenerationStatus, updateGenerationCopy, setGenerationWinner,
-  getBrand, getGenerationOverrides, updateGenerationOverrides,
+  getBrand, getGenerationOverrides, updateGenerationOverrides, recordVisionReview,
 } from "@/lib/repo";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { AdOverrides, mergeOverrides, parseOverrides } from "@/lib/composer/overrides";
 import { saveUploadedImage } from "@/lib/images/providers";
 import { requireGenerationAccess } from "@/lib/authz";
+import { runVisionCritic, type VisionCritique } from "@/lib/agents/vision-critic";
 
 const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 
@@ -73,6 +75,36 @@ export async function requestRevision(id: string, note?: string) {
   revalidatePath(`/ads/${id}`);
   revalidatePath("/review");
 }
+// Vision QC: render the current composite to PNG (via the render route, so it
+// reflects edits/overrides), let the vision critic inspect the pixels, and store
+// the design score + a vision-critic review. Returns the critique for the UI.
+export async function runVisualQcAction(id: string): Promise<VisionCritique> {
+  const { generation: gen } = await requireGenerationAccess(id);
+  const brand = getBrand(gen.brand_id);
+  if (!brand) throw new Error("Brand missing");
+
+  let png: { bytes: Buffer; mime: string } | undefined;
+  try {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") || h.get("host");
+    const proto = h.get("x-forwarded-proto") || (host?.startsWith("localhost") ? "http" : "https");
+    if (host) {
+      const res = await fetch(`${proto}://${host}/api/render/${id}/png`, { cache: "no-store" });
+      if (res.ok) png = { bytes: Buffer.from(await res.arrayBuffer()), mime: "image/png" };
+    }
+  } catch { /* fall through to heuristic */ }
+
+  const { output } = await runVisionCritic({
+    brand, language: brand.language, formatSlug: gen.format_slug,
+    copy: { eyebrow: gen.eyebrow || undefined, headline: gen.headline, subhead: gen.subhead || "", cta: gen.cta },
+    png,
+  });
+  recordVisionReview(id, { score: output.overallScore, verdict: output.verdict, notes: output.notes, fixes: output.fixes });
+  revalidatePath(`/ads/${id}`);
+  revalidatePath("/review");
+  return output;
+}
+
 export async function saveCopy(id: string, copy: { headline: string; subhead: string; cta: string; eyebrow: string }) {
   await requireGenerationAccess(id);
   updateGenerationCopy(id, { headline: copy.headline, subhead: copy.subhead, cta: copy.cta, eyebrow: copy.eyebrow || undefined });

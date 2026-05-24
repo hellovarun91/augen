@@ -9,6 +9,7 @@ import { relativeDate } from "@/lib/utils";
 import { parseOverrides } from "@/lib/composer/overrides";
 import { AdDetailClient } from "./detail-client";
 import { CommentThread } from "@/components/comment-thread";
+import { VisualQC } from "@/components/visual-qc";
 import { Card, Section } from "@/components/ui/primitives";
 
 export const dynamic = "force-dynamic";
@@ -39,8 +40,13 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
           </div>
           <div className="flex items-center gap-3">
             <Badge tone={gen.confidence > 0.85 ? "ok" : gen.confidence > 0.7 ? "warn" : "danger"}>
-              confidence {(gen.confidence * 100).toFixed(0)}
+              copy {(gen.confidence * 100).toFixed(0)}
             </Badge>
+            {gen.design_score != null && (
+              <Badge tone={gen.design_score > 0.85 ? "ok" : gen.design_score > 0.6 ? "warn" : "danger"}>
+                design {(gen.design_score * 100).toFixed(0)}
+              </Badge>
+            )}
             <Badge tone={gen.status === "approved" ? "ok" : gen.status === "rejected" ? "danger" : gen.status === "needs_revision" ? "warn" : "info"}>
               {gen.status.replace("_", " ")}
             </Badge>
@@ -67,6 +73,12 @@ export default async function AdPage({ params }: { params: Promise<{ id: string 
         ideaSummary={idea ? { theme: idea.theme, angle: idea.angle, audience: idea.audience, insight: idea.insight || "" } : null}
         assets={listAssets(brand.id).map((a) => ({ id: a.id, label: a.label, file_path: a.file_path, kind: a.kind }))}
       />
+
+      <Section title="Visual QC" subtitle="A design critic that scores the rendered creative — legibility, contrast, composition, safe area, brand fit.">
+        <Card className="p-5">
+          <VisualQC id={gen.id} initialScore={gen.design_score} initialNotes={gen.design_notes} />
+        </Card>
+      </Section>
 
       {reviews.length > 0 && (
         <Section title="Review history" subtitle="Who decided what, and when.">

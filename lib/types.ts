@@ -193,6 +193,8 @@ export interface GenerationRow {
   status: string;
   confidence: number;
   notes: string | null;
+  design_score: number | null;
+  design_notes: string | null;
   cost_cents: number;
   created_at: number;
   updated_at: number;

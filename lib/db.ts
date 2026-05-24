@@ -255,6 +255,9 @@ function migrate(d: Database.Database) {
   try { d.prepare("ALTER TABLE campaigns ADD COLUMN signed_off_at INTEGER").run(); } catch {}
   // Copy Sheet row <-> creative link (CS3): a row can drive a specific generation's copy
   try { d.prepare("ALTER TABLE copy_rows ADD COLUMN generation_id TEXT").run(); } catch {}
+  // Vision QC critic: design score (0-1) + notes from inspecting the rendered pixels
+  try { d.prepare("ALTER TABLE generations ADD COLUMN design_score REAL").run(); } catch {}
+  try { d.prepare("ALTER TABLE generations ADD COLUMN design_notes TEXT").run(); } catch {}
   // Detailed usage tracking columns on agent_runs (additive — older rows have nulls)
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_create_tokens INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_read_tokens INTEGER").run(); } catch {}

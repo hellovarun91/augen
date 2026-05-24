@@ -299,6 +299,20 @@ export function updateGenerationStatus(id: string, status: string, note?: string
   );
 }
 
+// Persist a Vision QC critique: store the design score + notes on the generation,
+// and log a review row attributed to "vision-critic" so it shows in the timeline.
+export function recordVisionReview(generationId: string, input: { score: number; verdict: string; notes: string[]; fixes?: string[] }) {
+  const note = [
+    input.notes.length ? input.notes.join(" ") : "",
+    input.fixes && input.fixes.length ? `Fixes: ${input.fixes.join("; ")}` : "",
+  ].filter(Boolean).join(" — ");
+  db().prepare("UPDATE generations SET design_score = ?, design_notes = ?, updated_at = ? WHERE id = ?")
+    .run(input.score, note || null, nowMs(), generationId);
+  const rev = `rev_${nanoid(8)}`;
+  db().prepare("INSERT INTO reviews (id, generation_id, action, note, reviewer, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(rev, generationId, `visual:${input.verdict}`, note || null, "vision-critic", nowMs());
+}
+
 export interface ReviewRow {
   id: string; generation_id: string; action: string; note: string | null;
   reviewer: string | null; created_at: number;

@@ -149,6 +149,35 @@ describe("brand refine heuristic (M-D, no AI key)", () => {
   });
 });
 
+describe("vision QC critic (heuristic fallback)", () => {
+  it("returns a well-formed critique without pixels or a key, and is honest about it", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const { runVisionCritic } = await import("@/lib/agents/vision-critic");
+    const brand = fakeBrand();
+    const { output } = await runVisionCritic({
+      brand, language: brand.language, formatSlug: "meta-feed-1x1",
+      copy: { headline: "An honest upgrade", subhead: "A subhead.", cta: "See more", eyebrow: "NEW" },
+    });
+    expect(output.viaVision).toBe(false);
+    expect(["ship", "revise", "kill"]).toContain(output.verdict);
+    for (const k of ["legibility", "contrast", "composition", "safeArea", "brandFit", "overallScore"] as const) {
+      expect(output[k]).toBeGreaterThanOrEqual(0);
+      expect(output[k]).toBeLessThanOrEqual(1);
+    }
+    expect(output.notes.join(" ").toLowerCase()).toContain("heuristic");
+  });
+
+  it("flags overflow risk for a long headline on a wide banner", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const { runVisionCritic } = await import("@/lib/agents/vision-critic");
+    const brand = fakeBrand();
+    const short = await runVisionCritic({ brand, language: brand.language, formatSlug: "google-display-728x90", copy: { headline: "Short and sweet", subhead: "", cta: "Go" } });
+    const long = await runVisionCritic({ brand, language: brand.language, formatSlug: "google-display-728x90", copy: { headline: "A dramatically overlong headline that will never fit a leaderboard banner crop", subhead: "", cta: "Go" } });
+    expect(long.output.legibility).toBeLessThan(short.output.legibility);
+    expect(long.output.fixes.join(" ").toLowerCase()).toContain("shorten");
+  });
+});
+
 describe("url ingest (M-C)", () => {
   it("blocks internal and malformed URLs without network", async () => {
     const { fetchSiteText } = await import("@/lib/ingest/url");
