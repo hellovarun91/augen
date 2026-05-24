@@ -467,6 +467,19 @@ function migrate(d: Database.Database) {
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS copy_rows_campaign_idx ON copy_rows(campaign_id);
+
+  -- Comments & @mentions — one thread per object (creative, project, copy row, brand).
+  CREATE TABLE IF NOT EXISTS comments (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT,
+    target_type TEXT NOT NULL,    -- creative | project | copy_row | brand
+    target_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    mentions_json TEXT NOT NULL DEFAULT '[]',
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS comments_target_idx ON comments(target_type, target_id);
   `);
 }
 

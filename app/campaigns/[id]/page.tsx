@@ -1,9 +1,12 @@
 import { Badge, Card, Empty, Eyebrow, LinkButton, Section } from "@/components/ui/primitives";
-import { getBrand, getCampaign, listCampaignFormats, listGenerationsByCampaign, listIdeas } from "@/lib/repo";
+import { getBrand, getCampaign, listCampaignFormats, listGenerationsByCampaign, listIdeas, listComments } from "@/lib/repo";
+import { listMembershipsForBrand } from "@/lib/users";
+import { getSession } from "@/lib/session";
 import { ALL_FORMATS, formatBySlug, formatsByPlatform } from "@/lib/formats";
 import { notFound } from "next/navigation";
 import { AdPreview } from "@/components/ad-preview";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
+import { CommentThread } from "@/components/comment-thread";
 import { RunCampaignButton, BriefEditor, ProjectDetailActions } from "./controls";
 import Link from "next/link";
 
@@ -29,6 +32,10 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const labels = Object.fromEntries(
     listCampaignFormats(campaign.id).filter((r) => r.label).map((r) => [r.format_slug, r.label!]),
   );
+
+  const { user } = await getSession();
+  const members = listMembershipsForBrand(brand.id).map((m) => ({ id: m.user_id, name: m.user.name, color: m.user.avatar_color }));
+  const comments = listComments("project", campaign.id);
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
@@ -144,6 +151,12 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           })}
         </Section>
       )}
+
+      <Section title="Discussion" subtitle="Talk it through with the team — @mention anyone on the brand.">
+        <Card className="p-5">
+          <CommentThread brandId={brand.id} targetType="project" targetId={campaign.id} members={members} currentUserId={user?.id || null} initial={comments} />
+        </Card>
+      </Section>
     </div>
   );
 }

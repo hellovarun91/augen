@@ -471,6 +471,43 @@ export function deleteCopyRow(id: string) {
   db().prepare("DELETE FROM copy_rows WHERE id = ?").run(id);
 }
 
+// ---------- Comments & @mentions ----------
+
+export interface CommentRow {
+  id: string; brand_id: string | null; target_type: string; target_id: string;
+  author_id: string; body: string; mentions: string[]; created_at: number;
+  author: { name: string; email: string; color: string };
+}
+
+export function listComments(targetType: string, targetId: string): CommentRow[] {
+  const rows = db().prepare(`
+    SELECT c.*, u.name u_name, u.email u_email, u.avatar_color u_color
+    FROM comments c LEFT JOIN users u ON u.id = c.author_id
+    WHERE c.target_type = ? AND c.target_id = ?
+    ORDER BY c.created_at ASC
+  `).all(targetType, targetId) as any[];
+  return rows.map((r) => ({
+    id: r.id, brand_id: r.brand_id, target_type: r.target_type, target_id: r.target_id,
+    author_id: r.author_id, body: r.body, mentions: r.mentions_json ? JSON.parse(r.mentions_json) : [], created_at: r.created_at,
+    author: { name: r.u_name || "Someone", email: r.u_email || "", color: r.u_color || "#C9A45C" },
+  }));
+}
+
+export function getComment(id: string): { id: string; brand_id: string | null; author_id: string } | null {
+  return (db().prepare("SELECT id, brand_id, author_id FROM comments WHERE id = ?").get(id) as any) || null;
+}
+
+export function createComment(input: { brandId?: string | null; targetType: string; targetId: string; authorId: string; body: string; mentions?: string[] }): CommentRow {
+  const id = `cmt_${nanoid(12)}`;
+  db().prepare(`INSERT INTO comments (id, brand_id, target_type, target_id, author_id, body, mentions_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, input.brandId || null, input.targetType, input.targetId, input.authorId, input.body, JSON.stringify(input.mentions || []), nowMs());
+  return listComments(input.targetType, input.targetId).find((c) => c.id === id)!;
+}
+
+export function deleteComment(id: string) {
+  db().prepare("DELETE FROM comments WHERE id = ?").run(id);
+}
+
 // ---------- Brand assets (logo / icon / badge bank) ----------
 
 export type AssetKind = "logo" | "mark" | "icon" | "badge" | "graphic";
