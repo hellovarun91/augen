@@ -47,6 +47,7 @@ export function SidebarNav({
                 <NavItem href={`/brands/${b}/figma`} label="Figma sync" active={path.startsWith(`/brands/${b}/figma`)} sub />
               </>
             )}
+            <NavItem href={`/brands/${b}/assets`} label="Assets" active={path.startsWith(`/brands/${b}/assets`)} />
             <NavItem href={`/brands/${b}/references`} label="References" active={path.startsWith(`/brands/${b}/references`)} />
             <NavItem href={`/brands/${b}/winners`} label="Winners" active={path.startsWith(`/brands/${b}/winners`)} />
           </Section>

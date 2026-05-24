@@ -435,6 +435,25 @@ function migrate(d: Database.Database) {
         AND NOT EXISTS (SELECT 1 FROM api_spend s WHERE s.run_id = ar.id)
     `).run();
   } catch {}
+
+  // Brand asset bank — reusable brand graphics composited as-is (logo, mark,
+  // icon, badge, graphic). Distinct from references_ (photographic conditioning).
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS brand_assets (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,           -- logo | mark | icon | badge | graphic
+    role TEXT NOT NULL DEFAULT '', -- '' | primary | inverse (locker logo designation)
+    label TEXT,
+    file_path TEXT NOT NULL,       -- /api/refs/<file>
+    mime TEXT NOT NULL,
+    width INTEGER,
+    height INTEGER,
+    tags TEXT,                     -- JSON array
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS brand_assets_brand_idx ON brand_assets(brand_id);
+  `);
 }
 
 export function nowMs() {

@@ -46,6 +46,7 @@ export function MobileNav({
         { href: `/brands/${b}/tokens`, label: "Design tokens" },
         { href: `/brands/${b}/tokens/extract`, label: "Extract from artwork" },
         { href: `/brands/${b}/figma`, label: "Figma sync" },
+        { href: `/brands/${b}/assets`, label: "Assets" },
         { href: `/brands/${b}/references`, label: "References" },
         { href: `/brands/${b}/winners`, label: "Winners" },
       ]

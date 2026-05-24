@@ -159,12 +159,25 @@ export async function saveBytes(brandSlug: string, bytes: Buffer, mime: string):
 }
 
 function inferExt(mime: string, name?: string): string {
-  if (name && /\.(png|jpe?g|webp|gif|avif)$/i.test(name)) return name.match(/\.[a-z0-9]+$/i)![0].toLowerCase();
+  if (name && /\.(png|jpe?g|webp|gif|avif|svg)$/i.test(name)) return name.match(/\.[a-z0-9]+$/i)![0].toLowerCase();
+  if (mime.includes("svg")) return ".svg";
   if (mime.includes("png")) return ".png";
   if (mime.includes("webp")) return ".webp";
   if (mime.includes("gif")) return ".gif";
   if (mime.includes("avif")) return ".avif";
   return ".jpg";
+}
+
+// Minimal SVG hardening for operator-uploaded brand assets: drop scripts, event
+// handlers, external/js URLs, and foreignObject. Not a full sanitizer, but
+// removes the common XSS vectors before we ever serve or inline the file.
+export function sanitizeSvg(svg: string): string {
+  return svg
+    .replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, "")
+    .replace(/<\s*foreignObject[\s\S]*?<\s*\/\s*foreignObject\s*>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|xlink:href)\s*=\s*("javascript:[^"]*"|'javascript:[^']*')/gi, "")
+    .replace(/<!ENTITY[\s\S]*?>/gi, "");
 }
 
 function parseAspect(a: string): [number, number] {

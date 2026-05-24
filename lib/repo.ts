@@ -392,6 +392,71 @@ export function toggleReferenceSelected(id: string, selected: boolean) {
   db().prepare("UPDATE references_ SET selected = ? WHERE id = ?").run(selected ? 1 : 0, id);
 }
 
+// ---------- Brand assets (logo / icon / badge bank) ----------
+
+export type AssetKind = "logo" | "mark" | "icon" | "badge" | "graphic";
+export type AssetRole = "" | "primary" | "inverse";
+
+export interface BrandAsset {
+  id: string; brand_id: string; kind: AssetKind; role: AssetRole;
+  label: string | null; file_path: string; mime: string;
+  width: number | null; height: number | null; tags: string[]; created_at: number;
+}
+
+function hydrateAsset(row: any): BrandAsset {
+  return { ...row, tags: row.tags ? JSON.parse(row.tags) : [] };
+}
+
+export function listAssets(brandId: string): BrandAsset[] {
+  return (db().prepare("SELECT * FROM brand_assets WHERE brand_id = ? ORDER BY created_at DESC").all(brandId) as any[]).map(hydrateAsset);
+}
+
+export function getAsset(id: string): BrandAsset | null {
+  const r = db().prepare("SELECT * FROM brand_assets WHERE id = ?").get(id) as any;
+  return r ? hydrateAsset(r) : null;
+}
+
+export function createAsset(input: {
+  brandId: string; kind: AssetKind; role?: AssetRole; label?: string;
+  filePath: string; mime: string; width?: number; height?: number; tags?: string[];
+}): BrandAsset {
+  const id = `asset_${nanoid(10)}`;
+  db().prepare(`
+    INSERT INTO brand_assets (id, brand_id, kind, role, label, file_path, mime, width, height, tags, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, input.brandId, input.kind, input.role || "", input.label || null,
+    input.filePath, input.mime, input.width || null, input.height || null,
+    JSON.stringify(input.tags || []), nowMs(),
+  );
+  return getAsset(id)!;
+}
+
+export function deleteAsset(id: string) {
+  db().prepare("DELETE FROM brand_assets WHERE id = ?").run(id);
+}
+
+// Designate the primary or inverse locker logo — only one of each per brand.
+export function setAssetRole(id: string, role: AssetRole) {
+  const asset = getAsset(id);
+  if (!asset) return;
+  if (role === "primary" || role === "inverse") {
+    db().prepare("UPDATE brand_assets SET role = '' WHERE brand_id = ? AND role = ?").run(asset.brand_id, role);
+  }
+  db().prepare("UPDATE brand_assets SET role = ? WHERE id = ?").run(role, id);
+}
+
+// The logo to composite in the locker. variant 'inverse' is the light/knockout
+// logo for dark backgrounds; falls back to the primary when no inverse exists.
+export function getLockerLogo(brandId: string, variant: "primary" | "inverse" = "primary"): BrandAsset | null {
+  if (variant === "inverse") {
+    const inv = db().prepare("SELECT * FROM brand_assets WHERE brand_id = ? AND role = 'inverse'").get(brandId) as any;
+    if (inv) return hydrateAsset(inv);
+  }
+  const primary = db().prepare("SELECT * FROM brand_assets WHERE brand_id = ? AND role = 'primary'").get(brandId) as any;
+  return primary ? hydrateAsset(primary) : null;
+}
+
 // ---------- Copy variants ----------
 
 export interface CopyVariantRow {
