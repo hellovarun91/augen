@@ -73,6 +73,14 @@ export function removeMembership(id: string) {
   db().prepare("DELETE FROM memberships WHERE id = ?").run(id);
 }
 
+export function getMembership(id: string): Membership | null {
+  return (db().prepare("SELECT * FROM memberships WHERE id = ?").get(id) as Membership) || null;
+}
+
+export function updateMembershipRole(id: string, role: string) {
+  db().prepare("UPDATE memberships SET role = ? WHERE id = ?").run(role, id);
+}
+
 export function userHasBrandAccess(userId: string, brandId: string): boolean {
   const row = db().prepare("SELECT 1 FROM memberships WHERE user_id = ? AND brand_id = ?").get(userId, brandId);
   return !!row;

@@ -16,6 +16,7 @@ const BRAND_SECTIONS: Array<{ seg: string; label: string }> = [
   { seg: "assets", label: "Assets" },
   { seg: "references", label: "References" },
   { seg: "winners", label: "Winners" },
+  { seg: "team", label: "Team" },
   { seg: "plan", label: "AI Planner" },
 ];
 

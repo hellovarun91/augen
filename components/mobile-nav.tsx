@@ -49,6 +49,7 @@ export function MobileNav({
         { href: `/brands/${b}/assets`, label: "Assets" },
         { href: `/brands/${b}/references`, label: "References" },
         { href: `/brands/${b}/winners`, label: "Winners" },
+        { href: `/brands/${b}/team`, label: "Team" },
       ]
     : [];
 
