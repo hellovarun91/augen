@@ -10,6 +10,8 @@ import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStat
 import { generateImage, saveBytes } from "@/lib/images/providers";
 import type { AgentProvider } from "./types";
 import { claudeModel, getClaude } from "./adapters/claude";
+import { recordSpend } from "@/lib/spend";
+import { imagePriceMicros } from "./pricing";
 
 function currentProvider(): AgentProvider {
   return getClaude()
@@ -40,6 +42,7 @@ export async function generateAdsViaAgents(args: {
   brief: CampaignBrief;
   variantsPerFormat?: number;
   copyConstraint?: string;
+  userId?: string;
 }): Promise<GenerateChainResult> {
   const ideas = listIdeas(args.campaignId);
   if (!ideas.length) {
@@ -81,6 +84,7 @@ export async function generateAdsViaAgents(args: {
           brandId: args.brand.id,
           campaignId: args.campaignId,
           ideaId: idea.id,
+          userId: args.userId,
           provider,
           input: { brandSlug: args.brand.slug, idea: idea.theme, product, formatSlug, variantIndex: v },
           fn: () => runArtDirector({
@@ -102,6 +106,7 @@ export async function generateAdsViaAgents(args: {
           brandId: args.brand.id,
           campaignId: args.campaignId,
           ideaId: idea.id,
+          userId: args.userId,
           provider,
           input: { idea: idea.theme, product, formatSlug, count: 3, constraint: args.copyConstraint },
           fn: () => runCopywriter({
@@ -132,6 +137,7 @@ export async function generateAdsViaAgents(args: {
       chainId,
       brandId: args.brand.id,
       campaignId: args.campaignId,
+      userId: args.userId,
       provider,
       input: { batch: slice.map((p) => ({ formatSlug: p.formatSlug, copy: p.chosen, idea: p.idea.theme })) },
       fn: () => runCriticBatch({
@@ -184,6 +190,10 @@ export async function generateAdsViaAgents(args: {
     } else if (process.env.GEMINI_API_KEY) {
       const img = await generateImage(p.art.imagePrompt, p.fmt.aspect);
       if (img) {
+        recordSpend({
+          userId: args.userId, brandId: args.brand.id, campaignId: args.campaignId, generationId: gen.id,
+          provider: "gemini", category: "image", model: img.source, qty: 1, costMicros: imagePriceMicros(),
+        });
         const saved = await saveBytes(args.brand.slug, img.bytes, img.mime);
         const ref = createReference({
           brandId: args.brand.id,
@@ -217,6 +227,7 @@ export async function strategistOnly(args: {
   year?: number;
   notes?: string;
   count: number;
+  userId?: string;
 }): Promise<{ chainId: string; runId: string; ideaCount: number }> {
   const chainId = newChainId();
   const run = await recordRun({
@@ -224,6 +235,7 @@ export async function strategistOnly(args: {
     chainId,
     brandId: args.brand.id,
     campaignId: args.campaignId,
+    userId: args.userId,
     provider: currentProvider(),
     input: { brief: args.brief, quarter: args.quarter, year: args.year, count: args.count, notes: args.notes },
     fn: () => runStrategist({

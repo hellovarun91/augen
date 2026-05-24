@@ -396,6 +396,45 @@ function migrate(d: Database.Database) {
   try {
     d.prepare("UPDATE references_ SET file_path = '/api/refs/' || SUBSTR(file_path, 7) WHERE file_path LIKE '/refs/%'").run();
   } catch {}
+
+  // Unified API spend ledger — every real external call (Claude reasoning,
+  // Gemini image, Claude vision, Pexels stock) writes one row of true COGS.
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS api_spend (
+    id TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL,
+    user_id TEXT,
+    brand_id TEXT,
+    campaign_id TEXT,
+    generation_id TEXT,
+    run_id TEXT,
+    provider TEXT NOT NULL,    -- claude | gemini | pexels
+    category TEXT NOT NULL,    -- reasoning | image | vision | stock
+    model TEXT,
+    qty INTEGER NOT NULL DEFAULT 1,
+    cost_micros INTEGER NOT NULL DEFAULT 0,
+    meta_json TEXT
+  );
+  CREATE INDEX IF NOT EXISTS spend_created_idx ON api_spend(created_at);
+  CREATE INDEX IF NOT EXISTS spend_brand_idx ON api_spend(brand_id);
+  CREATE INDEX IF NOT EXISTS spend_campaign_idx ON api_spend(campaign_id);
+  CREATE INDEX IF NOT EXISTS spend_user_idx ON api_spend(user_id);
+  CREATE INDEX IF NOT EXISTS spend_run_idx ON api_spend(run_id);
+  `);
+
+  // Idempotent backfill: seed the ledger from historical agent_runs that already
+  // carry real cost. Skips runs already represented (by run_id), so it's safe on
+  // every boot and never double-counts ongoing recordSpend writes.
+  try {
+    d.prepare(`
+      INSERT INTO api_spend (id, created_at, brand_id, campaign_id, generation_id, run_id, provider, category, model, qty, cost_micros)
+      SELECT 'spend_run_' || ar.id, ar.created_at, ar.brand_id, ar.campaign_id, ar.generation_id, ar.id,
+             ar.provider, 'reasoning', ar.model, 1, ar.cost_micros
+      FROM agent_runs ar
+      WHERE ar.cost_micros > 0 AND ar.provider != 'mock'
+        AND NOT EXISTS (SELECT 1 FROM api_spend s WHERE s.run_id = ar.id)
+    `).run();
+  } catch {}
 }
 
 export function nowMs() {

@@ -82,7 +82,7 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
         ))}
       </div>
 
-      <Section title="Accept the plan?" subtitle="Adds these as live campaigns under this brand. You can run any one of them right after.">
+      <Section title="Accept the plan?" subtitle="Adds these as projects under this brand. You can open any one of them right after.">
         <AcceptPlanForm brandId={brand.id} year={year} quarter={quarter} />
       </Section>
 
@@ -94,11 +94,11 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
           </div>
           <div>
             <Eyebrow>Objective coverage</Eyebrow>
-            <p className="text-ink-200 mt-2">One awareness, one consideration, one conversion campaign. So the budget pyramids correctly across the quarter.</p>
+            <p className="text-ink-200 mt-2">One awareness, one consideration, one conversion project — so the work builds correctly across the quarter.</p>
           </div>
           <div>
             <Eyebrow>Audience layering</Eyebrow>
-            <p className="text-ink-200 mt-2">Audiences come from the industry's pre-baked profiles, then re-sampled per idea so no two ideas in a campaign share the same audience.</p>
+            <p className="text-ink-200 mt-2">Audiences come from the industry's pre-baked profiles, then re-sampled per idea so no two ideas in a project share the same audience.</p>
           </div>
         </Card>
       </Section>

@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requireBrandAccess } from "@/lib/authz";
 import { chargeCredits } from "@/lib/credits";
 import { rateLimit } from "@/lib/ratelimit";
+import { recordSpend } from "@/lib/spend";
+import { imagePriceMicros } from "@/lib/agents/pricing";
 
 const MAX_UPLOAD = 12 * 1024 * 1024;
 
@@ -40,6 +42,7 @@ export async function stockSearchAction(brandId: string, fd: FormData) {
   if (!query) throw new Error("Query required");
   const result = await searchStock(query, orientation);
   if (!result) throw new Error("Stock search returned nothing (or PEXELS_API_KEY missing)");
+  recordSpend({ userId: user.id, brandId, provider: "pexels", category: "stock", model: "pexels", qty: 1, costMicros: 0, meta: { query } });
   const saved = await saveBytes(brand.slug, result.bytes, result.mime);
   createReference({
     brandId, kind: "stock", source: "pexels",
@@ -64,6 +67,7 @@ export async function generateRefAction(brandId: string, brandSlug: string, fd: 
   if (!prompt) throw new Error("Prompt required");
   const result = await generateImage(`${prompt} — brand: ${brand.name}. Style: ${brand.tokens.imagery.style}. ${brand.tokens.imagery.treatment}`, aspect);
   if (!result) throw new Error("Generation returned nothing (or GEMINI_API_KEY missing / endpoint not yet GA)");
+  recordSpend({ userId: user.id, brandId, provider: "gemini", category: "image", model: result.source, qty: 1, costMicros: imagePriceMicros() });
   const saved = await saveBytes(brand.slug, result.bytes, result.mime);
   createReference({
     brandId, kind: "generated", source: "gemini",

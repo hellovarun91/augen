@@ -1,10 +1,11 @@
 import { Badge, Card, Empty, Eyebrow, LinkButton, Section, Stat } from "@/components/ui/primitives";
-import { getBilling, getBrandBySlug, listCampaignsByBrand } from "@/lib/repo";
+import { getBrandBySlug, listCampaignsByBrand, listGenerationsByCampaign } from "@/lib/repo";
 import { formatBySlug } from "@/lib/formats";
-import { AdPreviewPreview } from "@/components/ad-preview";
+import { AdPreview, AdPreviewPreview } from "@/components/ad-preview";
+import { SyncActiveBrand } from "@/components/sync-active-brand";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatCents, relativeDate } from "@/lib/utils";
+import { relativeDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +13,16 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
   const { slug } = await params;
   const brand = getBrandBySlug(slug);
   if (!brand) notFound();
-  const campaigns = listCampaignsByBrand(brand.id);
-  const billing = getBilling(brand.id);
+  const projects = listCampaignsByBrand(brand.id);
+  const gens = projects.flatMap((c) => listGenerationsByCampaign(c.id));
+  const pending = gens.filter((g) => g.status === "pending_review");
+  const approved = gens.filter((g) => g.status === "approved");
 
   const previewFormats = ["meta-feed-1x1", "meta-feed-4x5", "meta-story-9x16", "google-display-300x600"];
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
+      <SyncActiveBrand brandId={brand.id} />
       <header
         className="rounded-2xl p-8 ring-1 ring-white/10"
         style={{ background: `linear-gradient(135deg, ${brand.tokens.palette.primary}, ${brand.tokens.palette.accent})` }}
@@ -35,8 +39,8 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
           </div>
           <div className="flex flex-col items-end gap-3">
             <div className="flex gap-2">
-              <LinkButton href={`/brands/${brand.slug}/tokens`} variant="secondary" size="sm">Tokens</LinkButton>
-              <LinkButton href={`/brands/${brand.slug}/plan`} variant="secondary" size="sm">Plan quarter</LinkButton>
+              <LinkButton href={`/brands/${brand.slug}/plan`} variant="secondary" size="sm">Plan a quarter</LinkButton>
+              <LinkButton href="/campaigns" variant="secondary" size="sm">Open Studio</LinkButton>
             </div>
             <div className="flex items-center gap-2">
               {Object.entries(brand.tokens.palette).slice(0, 6).map(([k, v]) => (
@@ -48,11 +52,69 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
       </header>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <Card className="p-5"><Stat label="Campaigns" value={campaigns.length} /></Card>
-        <Card className="p-5"><Stat label="Voice" value={<span className="serif text-2xl">{brand.tokens.voice.tone.slice(0, 2).join(", ")}</span>} /></Card>
-        <Card className="p-5"><Stat label="Imagery" value={<span className="serif text-2xl capitalize">{brand.tokens.imagery.style}</span>} /></Card>
-        <Card className="p-5"><Stat label="Balance" value={formatCents(billing?.balance_cents || 0)} sub="mock credits" /></Card>
+        <Card className="p-5"><Stat label="Projects" value={projects.length} /></Card>
+        <Card className="p-5"><Stat label="Creatives" value={gens.length} /></Card>
+        <Card className="p-5"><Stat label="Pending review" value={pending.length} /></Card>
+        <Card className="p-5"><Stat label="Approved" value={approved.length} /></Card>
       </div>
+
+      {pending.length > 0 && (
+        <Section
+          title="Pending review"
+          subtitle="Creatives waiting on your call. Triaged low-to-high confidence."
+          action={<LinkButton href="/review" variant="ghost" size="sm">Open review →</LinkButton>}
+        >
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {pending.slice(0, 8).map((g) => (
+              <Link key={g.id} href={`/ads/${g.id}`} className="group block space-y-2">
+                <AdPreview generationId={g.id} width={g.width} height={g.height} />
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-ink-300">{g.format_slug}</span>
+                  <Badge tone={g.confidence > 0.85 ? "ok" : g.confidence > 0.7 ? "warn" : "danger"}>
+                    {(g.confidence * 100).toFixed(0)}
+                  </Badge>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <Section
+        title="Studio projects"
+        subtitle="A project holds a brief, its ideas, and the creatives they produce."
+        action={<LinkButton href={`/brands/${brand.slug}/plan`} variant="ghost" size="sm">Plan another quarter →</LinkButton>}
+      >
+        {projects.length === 0 ? (
+          <Empty title="No projects yet">
+            Plan a quarter and Augen drafts three projects to start from.
+            <div className="mt-4"><LinkButton href={`/brands/${brand.slug}/plan`}>Plan a quarter →</LinkButton></div>
+          </Empty>
+        ) : (
+          <div className="grid md:grid-cols-2 gap-4">
+            {projects.map((c) => (
+              <Link key={c.id} href={`/campaigns/${c.id}`}>
+                <Card className="p-5 transition-colors hover:bg-ink-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="serif text-xl tracking-tight">{c.name}</div>
+                      <div className="text-xs text-ink-400 mt-1">{relativeDate(c.created_at)} · {c.quarter} {c.year}</div>
+                    </div>
+                    <Badge tone={c.status === "approved" ? "ok" : c.status === "ready_for_review" ? "info" : "neutral"}>
+                      {c.status.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-4 text-xs">
+                    <div><Eyebrow>Audience</Eyebrow><div className="text-ink-200 mt-1 line-clamp-1">{c.audience || "—"}</div></div>
+                    <div><Eyebrow>Objective</Eyebrow><div className="text-ink-200 mt-1">{c.objective || "—"}</div></div>
+                    <div><Eyebrow>Formats</Eyebrow><div className="text-ink-200 mt-1">{c.brief.formats.length}</div></div>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Section>
 
       <Section title="Sample creative" subtitle="Drafted with placeholder copy — to test the token system across the format catalog.">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
@@ -67,7 +129,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
                     eyebrow: "FIELD-TESTED",
                     headline: brand.tagline?.replace(/\.\s*/g, ".\n") || "An honest\nupgrade.",
                     subhead: "A token system survives the format. So does the voice.",
-                    cta: "See campaigns",
+                    cta: "See projects",
                   }}
                 />
                 <div className="flex items-center justify-between text-xs">
@@ -78,42 +140,6 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
             );
           })}
         </div>
-      </Section>
-
-      <Section
-        title="Quarterly campaigns"
-        subtitle="Drafted by the planner. Edit, regenerate, or run any one of them."
-        action={<LinkButton href={`/brands/${brand.slug}/plan`} variant="ghost" size="sm">Plan another quarter →</LinkButton>}
-      >
-        {campaigns.length === 0 ? (
-          <Empty title="No campaigns drafted yet">
-            Run the planner to seed three campaigns for the next quarter.
-            <div className="mt-4"><LinkButton href={`/brands/${brand.slug}/plan`}>Plan a quarter →</LinkButton></div>
-          </Empty>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-4">
-            {campaigns.map((c) => (
-              <Link key={c.id} href={`/campaigns/${c.id}`}>
-                <Card className="p-5 transition-colors hover:bg-ink-800">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="serif text-xl tracking-tight">{c.name}</div>
-                      <div className="text-xs text-ink-400 mt-1">{relativeDate(c.created_at)} · {c.quarter} {c.year}</div>
-                    </div>
-                    <Badge tone={c.status === "approved" ? "ok" : c.status === "ready_for_review" ? "info" : "neutral"}>
-                      {c.status}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 mt-4 text-xs">
-                    <div><Eyebrow>Audience</Eyebrow><div className="text-ink-200 mt-1 line-clamp-1">{c.audience || "—"}</div></div>
-                    <div><Eyebrow>Objective</Eyebrow><div className="text-ink-200 mt-1">{c.objective || "—"}</div></div>
-                    <div><Eyebrow>Formats</Eyebrow><div className="text-ink-200 mt-1">{c.brief.formats.length}</div></div>
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
       </Section>
 
       <Section title="Voice notes">

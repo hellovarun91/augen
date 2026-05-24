@@ -53,6 +53,16 @@ export function budgetUsd(): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Image-generation price per image (USD). Defaults to a Gemini flash-image
+// ballpark; override with AUGEN_PRICE_IMAGE_USD as real rates settle.
+export function imagePriceUsd(): number {
+  return num(process.env.AUGEN_PRICE_IMAGE_USD, 0.04);
+}
+
+export function imagePriceMicros(): number {
+  return Math.round(imagePriceUsd() * 1e6);
+}
+
 function num(v: string | undefined, d: number): number {
   if (!v) return d;
   const n = parseFloat(v);

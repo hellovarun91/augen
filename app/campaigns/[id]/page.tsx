@@ -3,6 +3,7 @@ import { getBrand, getCampaign, listCampaignFormats, listGenerationsByCampaign, 
 import { ALL_FORMATS, formatBySlug, formatsByPlatform } from "@/lib/formats";
 import { notFound } from "next/navigation";
 import { AdPreview } from "@/components/ad-preview";
+import { SyncActiveBrand } from "@/components/sync-active-brand";
 import { RunCampaignButton, BriefEditor } from "./controls";
 import Link from "next/link";
 
@@ -31,6 +32,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
+      <SyncActiveBrand brandId={brand.id} />
       <header className="space-y-3">
         <Link href={`/brands/${brand.slug}`} className="text-xs text-ink-400 hover:text-ink-100">← {brand.name}</Link>
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
@@ -51,7 +53,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="p-5"><Eyebrow>Audience</Eyebrow><div className="text-base mt-1 truncate">{campaign.audience || "—"}</div></Card>
         <Card className="p-5"><Eyebrow>Formats enabled</Eyebrow><div className="text-2xl font-medium mt-1">{campaign.brief.formats.length}</div></Card>
-        <Card className="p-5"><Eyebrow>Ads generated</Eyebrow><div className="text-2xl font-medium mt-1">{gens.length}</div></Card>
+        <Card className="p-5"><Eyebrow>Creatives</Eyebrow><div className="text-2xl font-medium mt-1">{gens.length}</div></Card>
         <Card className="p-5"><Eyebrow>Approved</Eyebrow><div className="text-2xl font-medium mt-1">{gens.filter((g) => g.status === "approved").length}</div></Card>
       </div>
 
@@ -108,7 +110,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       {gens.length > 0 && (
         <Section
           title="Deliverables"
-          subtitle="All ad variants this campaign produced, grouped by format. Click into any one to review."
+          subtitle="Every creative this project produced, grouped by format. Click into any one to review."
           action={<LinkButton href={`/campaigns/${campaign.id}/deliverables`} variant="ghost" size="sm">Full deliverables view →</LinkButton>}
         >
           {Array.from(new Set(gens.map((g) => g.format_slug))).map((fs) => {

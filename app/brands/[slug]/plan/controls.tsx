@@ -32,7 +32,7 @@ export function AcceptPlanForm({ brandId, quarter, year }: { brandId: string; qu
     <form action={(fd) => start(async () => { await acceptPlan(brandId, quarter, year); })}>
       <div className="flex items-center gap-3">
         <Button type="submit" size="lg" disabled={pending}>{pending ? "Adding…" : `Accept ${quarter} ${year} plan →`}</Button>
-        <div className="text-xs text-ink-400">Adds 3 campaigns and 12 idea seeds. Idempotent — re-accepting refreshes nothing.</div>
+        <div className="text-xs text-ink-400">Adds 3 projects and 12 idea seeds. Idempotent — re-accepting refreshes nothing.</div>
       </div>
     </form>
   );

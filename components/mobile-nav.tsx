@@ -30,7 +30,7 @@ export function MobileNav({
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  const brandNav = activeBrand
+  const manageNav = activeBrand
     ? [
         { href: `/brands/${activeBrand.slug}`, label: "Overview" },
         { href: `/brands/${activeBrand.slug}/language`, label: "Language" },
@@ -39,21 +39,21 @@ export function MobileNav({
         { href: `/brands/${activeBrand.slug}/figma`, label: "Figma sync" },
         { href: `/brands/${activeBrand.slug}/references`, label: "References" },
         { href: `/brands/${activeBrand.slug}/winners`, label: "Winners" },
-        { href: `/brands/${activeBrand.slug}/plan`, label: "Quarterly plan" },
       ]
     : [];
 
-  const studioNav = [
-    { href: "/", label: "Dashboard" },
-    { href: "/campaigns", label: "Campaigns" },
-    { href: "/review", label: "Review queue" },
-    { href: "/formats", label: "Format catalog" },
-    { href: "/credits", label: "Credits & plan" },
-    { href: "/providers", label: "AI providers" },
-    { href: "/usage", label: "Token usage" },
-  ];
+  const studioNav = activeBrand
+    ? [
+        { href: `/brands/${activeBrand.slug}/plan`, label: "Plan a quarter" },
+        { href: "/campaigns", label: "Projects" },
+        { href: "/review", label: "Review" },
+      ]
+    : [];
 
-  const launchNav = [{ href: "/launch", label: "Launch (run ads)" }];
+  const settingsNav = [
+    { href: "/formats", label: "Format catalog" },
+    { href: "/providers", label: "AI providers" },
+  ];
 
   async function switchBrand(brandId: string) {
     await fetch(`/api/active-brand?id=${brandId}`, { method: "POST" });
@@ -120,27 +120,36 @@ export function MobileNav({
               </div>
             )}
 
-            {/* Brand nav */}
-            {activeBrand && (
-              <NavSection label={activeBrand.name}>
-                {brandNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href || path.startsWith(n.href + "/")} />)}
-              </NavSection>
+            {activeBrand ? (
+              <>
+                <div className="px-4 pt-2">
+                  <Link href="/" className="text-[11px] text-ink-400">← All brands</Link>
+                </div>
+                <NavSection label="Manage Brand">
+                  {manageNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href || (n.href !== `/brands/${activeBrand.slug}` && path.startsWith(n.href))} />)}
+                </NavSection>
+                <NavSection label="Studio">
+                  {studioNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href || path.startsWith(n.href + "/")} />)}
+                </NavSection>
+              </>
+            ) : (
+              <div className="px-4 py-3">
+                <p className="text-xs text-ink-400 leading-relaxed">Pick a brand to manage it and open its Studio.</p>
+              </div>
             )}
 
-            <NavSection label="Studio">
-              {studioNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href} />)}
-            </NavSection>
-
-            <NavSection label="Launch">
-              {launchNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href} />)}
+            <NavSection label="Settings">
+              {settingsNav.map((n) => <DrawerItem key={n.href} {...n} active={path === n.href} />)}
             </NavSection>
 
             {isAdmin && (
               <NavSection label="Admin">
                 <DrawerItem href="/admin" label="Overview" active={path === "/admin"} />
+                <DrawerItem href="/admin/costs" label="Cost dashboard" active={path === "/admin/costs"} />
                 <DrawerItem href="/admin/testers" label="Testers" active={path === "/admin/testers"} />
                 <DrawerItem href="/admin/users" label="Users" active={path.startsWith("/admin/users")} />
                 <DrawerItem href="/admin/features" label="Feature flags" active={path === "/admin/features"} />
+                <DrawerItem href="/usage" label="Token detail" active={path === "/usage"} />
               </NavSection>
             )}
 

@@ -13,7 +13,7 @@ export default async function ReviewPage() {
   if (!activeBrand) {
     return (
       <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto">
-        <Empty title="No active brand">Onboard a brand or switch to one in the sidebar.</Empty>
+        <Empty title="No brand selected">Pick a brand from the board to open its Studio.</Empty>
       </div>
     );
   }
@@ -28,15 +28,15 @@ export default async function ReviewPage() {
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
       <div>
-        <Eyebrow>{activeBrand.name} · review queue</Eyebrow>
+        <Eyebrow>{activeBrand.name} · review</Eyebrow>
         <h1 className="serif text-display-lg mt-1 tracking-tight">Review</h1>
         <p className="text-ink-300 mt-2 max-w-2xl">
-          Triaged lowest-confidence first. The QC Critic will explain why an ad scored where it did once the agent chain is wired.
+          Triaged lowest-confidence first — the score is the QC Critic's call on voice fit, format ergonomics, and concept strength.
         </p>
       </div>
 
       <Section title={`Pending — ${pending.length}`} subtitle="Lowest confidence first.">
-        {pending.length === 0 ? <Empty title="Queue clear">Generate ads from any campaign to populate this view.</Empty> : <Grid items={pending} />}
+        {pending.length === 0 ? <Empty title="Queue clear">Generate creatives from any project to populate this view.</Empty> : <Grid items={pending} />}
       </Section>
 
       <Section title={`Revisions — ${revisions.length}`} subtitle="Sent back with reviewer notes.">

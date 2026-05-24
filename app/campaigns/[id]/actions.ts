@@ -29,6 +29,7 @@ export async function runCampaignAction(campaignId: string, copyConstraint?: str
     brief: c.brief,
     variantsPerFormat: v,
     copyConstraint,
+    userId: user.id,
   });
   void track(user.id, "generate_ads", {
     campaign_id: campaignId, brand_id: b.id,
@@ -66,6 +67,7 @@ export async function runStrategistAction(campaignId: string, opts: { count: num
     year: c.year || undefined,
     count: opts.count,
     notes: opts.notes,
+    userId: user.id,
   });
   revalidatePath(`/campaigns/${campaignId}`);
   revalidatePath(`/campaigns/${campaignId}/agents`);

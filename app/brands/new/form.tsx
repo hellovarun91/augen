@@ -48,7 +48,7 @@ export function NewBrandForm({ presets }: { presets: { label: string; body: stri
             defaultValue="next"
             className="w-full rounded-lg bg-ink-800 px-3 py-2 text-sm text-ink-50 ring-1 ring-inset ring-white/10"
           >
-            <option value="next">Yes — draft 3 campaigns for the next quarter</option>
+            <option value="next">Yes — draft 3 projects for the next quarter</option>
             <option value="none">No — just create the brand</option>
           </select>
         </div>

@@ -7,6 +7,9 @@ import { redirect } from "next/navigation";
 import { requireBrandAccess } from "@/lib/authz";
 import { chargeCredits } from "@/lib/credits";
 import { rateLimit } from "@/lib/ratelimit";
+import { recordSpend } from "@/lib/spend";
+import { computeCostMicros } from "@/lib/agents/pricing";
+import { claudeModel } from "@/lib/agents/adapters/claude";
 
 const MAX_UPLOAD = 12 * 1024 * 1024;
 
@@ -25,6 +28,17 @@ export async function extractTokensAction(brandId: string, fd: FormData) {
     brandHintName: String(fd.get("brandName") || ""),
     brandHintIndustry: String(fd.get("industry") || ""),
   });
+  if (r.usage) {
+    recordSpend({
+      userId: user.id, brandId, provider: "claude", category: "vision", model: claudeModel(),
+      qty: 1, costMicros: computeCostMicros({
+        input_tokens: r.usage.input_tokens || 0,
+        output_tokens: r.usage.output_tokens || 0,
+        cache_creation_input_tokens: r.usage.cache_creation_input_tokens || 0,
+        cache_read_input_tokens: r.usage.cache_read_input_tokens || 0,
+      }),
+    });
+  }
   return r;
 }
 

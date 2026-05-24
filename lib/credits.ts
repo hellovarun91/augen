@@ -21,6 +21,14 @@ export const PRICING = {
 
 export type ActionKind = keyof typeof PRICING;
 
+// Subscription billing is OFF during the free beta — the credits engine stays
+// intact but no balance is charged (so testers never hit "insufficient credits").
+// Flip AUGEN_BILLING_ENABLED=true to re-enable per-tier credit charging later.
+export function billingEnabled(): boolean {
+  const v = process.env.AUGEN_BILLING_ENABLED;
+  return v === "true" || v === "1";
+}
+
 export interface CreditsRow {
   user_id: string;
   tier: Tier;
@@ -90,6 +98,8 @@ export function getBalance(userId: string): number {
 }
 
 export function chargeCredits(opts: ChargeOpts): { charged: number; balance: number } {
+  // Free beta: don't charge, don't block.
+  if (!billingEnabled()) return { charged: 0, balance: getBalance(opts.userId) };
   const cost = quoteCost(opts.action, opts.units || 1);
   const row = ensureCredits(opts.userId);
   if (row.balance < cost) {
@@ -109,6 +119,7 @@ export function chargeCredits(opts: ChargeOpts): { charged: number; balance: num
 }
 
 export function refundCredits(userId: string, amount: number, description?: string) {
+  if (!billingEnabled()) return;
   if (amount <= 0) return;
   db().prepare("UPDATE user_credits SET balance = balance + ?, lifetime_used = MAX(0, lifetime_used - ?) WHERE user_id = ?").run(amount, amount, userId);
   db().prepare(`

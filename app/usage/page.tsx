@@ -2,6 +2,9 @@ import { Badge, Card, Empty, Eyebrow, Section, Stat } from "@/components/ui/prim
 import { usageBreakdown, usagePerBrand, usageTotals } from "@/lib/agents/persistence";
 import { budgetUsd, formatUsd, getPricing } from "@/lib/agents/pricing";
 import { getBrand } from "@/lib/repo";
+import { getSession } from "@/lib/session";
+import { isAdmin } from "@/lib/admin";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +21,9 @@ export default function UsagePage({ searchParams }: { searchParams?: Promise<Rec
 }
 
 async function UsageContent(spPromise?: Promise<Record<string, string>>) {
+  const { user } = await getSession();
+  if (!user) redirect("/signin");
+  if (!isAdmin(user)) notFound();
   const sp = (await spPromise) || {};
   const period = sp.period || "month";
   const since = sinceMs(period);

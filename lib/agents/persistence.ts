@@ -2,6 +2,7 @@ import { db, nowMs } from "@/lib/db";
 import { nanoid } from "nanoid";
 import type { AgentKind, AgentProvider, AgentRunRow } from "./types";
 import { computeCostMicros, type UsageNumbers } from "./pricing";
+import { recordSpend, type SpendProvider } from "@/lib/spend";
 
 export interface AgentUsage {
   input_tokens?: number;
@@ -22,6 +23,7 @@ export async function recordRun<I, O>(opts: {
   campaignId?: string;
   ideaId?: string;
   generationId?: string;
+  userId?: string;
   provider: AgentProvider;
   input: I;
   fn: () => Promise<{ output: O; rationale: string; usage?: AgentUsage }>;
@@ -61,6 +63,15 @@ export async function recordRun<I, O>(opts: {
       u.input_tokens, u.output_tokens, u.cache_creation_input_tokens, u.cache_read_input_tokens, costMicros,
       id,
     );
+    // Mirror real reasoning cost into the unified spend ledger.
+    if (isReal && costMicros > 0) {
+      recordSpend({
+        userId: opts.userId, brandId: opts.brandId, campaignId: opts.campaignId,
+        generationId: opts.generationId, runId: id,
+        provider: opts.provider.name as SpendProvider, category: "reasoning",
+        model: opts.provider.model, costMicros,
+      });
+    }
     return { runId: id, output: result.output, rationale: result.rationale };
   } catch (e: any) {
     const duration = nowMs() - startedAt;

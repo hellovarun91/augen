@@ -1,9 +1,11 @@
 import type { BrandTokens } from "@/lib/types";
-import { claudeMaxTokens, claudeModel, extractToolUse, getClaude } from "./adapters/claude";
+import { claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import type { AgentUsage } from "./persistence";
 
 export interface TokenExtractionResult {
   rationale: string;
   tokens: BrandTokens;
+  usage?: AgentUsage;
 }
 
 const TOKEN_TOOL = {
@@ -123,5 +125,6 @@ export async function extractTokensFromImage(input: {
     tool_choice: { type: "tool", name: "emit_tokens" },
   });
 
-  return extractToolUse<TokenExtractionResult>(resp, "emit_tokens");
+  const out = extractToolUse<TokenExtractionResult>(resp, "emit_tokens");
+  return { ...out, usage: extractUsage(resp) };
 }
