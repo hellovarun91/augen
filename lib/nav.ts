@@ -12,11 +12,12 @@ const BRAND_SECTIONS: Array<{ seg: string; label: string }> = [
   { seg: "", label: "Overview" },
   { seg: "identity", label: "Identity" },
   { seg: "language", label: "Voice" },
+  { seg: "copy", label: "Copy" },
   { seg: "tokens", label: "Design tokens" },
   { seg: "assets", label: "Assets" },
   { seg: "references", label: "References" },
   { seg: "winners", label: "Winners" },
-  { seg: "plan", label: "Plan" },
+  { seg: "plan", label: "Planner" },
 ];
 
 function brandTabs(slug: string, pathname: string): NavTab[] {

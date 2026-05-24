@@ -8,7 +8,7 @@ import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
   title: "Augen — AI Ad Studio",
-  description: "Plug in a brand. Plan a quarter. Approve great ads. End-to-end.",
+  description: "Onboard a brand. Generate on-brand ads. Review and export. End-to-end.",
 };
 
 export const viewport: Viewport = {

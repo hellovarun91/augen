@@ -40,6 +40,7 @@ export function SidebarNav({
             <NavItem href={`/brands/${b}`} label="Overview" active={path === `/brands/${b}`} />
             <NavItem href={`/brands/${b}/identity`} label="Identity" active={path.startsWith(`/brands/${b}/identity`)} />
             <NavItem href={`/brands/${b}/language`} label="Voice" active={path.startsWith(`/brands/${b}/language`)} />
+            <NavItem href={`/brands/${b}/copy`} label="Copy" active={path.startsWith(`/brands/${b}/copy`)} />
             <NavItem href={`/brands/${b}/tokens`} label="Design tokens" active={path === `/brands/${b}/tokens`} />
             {onTokens && (
               <>
@@ -53,7 +54,7 @@ export function SidebarNav({
           </Section>
 
           <Section label="Studio">
-            <NavItem href={`/brands/${b}/plan`} label="Plan a quarter" active={path.startsWith(`/brands/${b}/plan`)} />
+            <NavItem href={`/brands/${b}/plan`} label="Planner" active={path.startsWith(`/brands/${b}/plan`)} />
             <NavItem href="/campaigns" label="Projects" active={path === "/campaigns" || path.startsWith("/campaigns/")} />
             <NavItem href="/review" label="Review" active={path.startsWith("/review")} />
           </Section>

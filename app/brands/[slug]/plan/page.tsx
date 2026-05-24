@@ -1,8 +1,9 @@
-import { Card, Eyebrow, Section, Badge, LinkButton } from "@/components/ui/primitives";
+import { Card, Eyebrow, Section } from "@/components/ui/primitives";
 import { getBrandBySlug } from "@/lib/repo";
 import { planQuarter } from "@/lib/ai/planner";
 import { notFound } from "next/navigation";
-import { PlannerControls, AcceptPlanForm } from "./controls";
+import { SyncActiveBrand } from "@/components/sync-active-brand";
+import { PlannerControls, PlannerWorkspace, type Proposal } from "./controls";
 
 export const dynamic = "force-dynamic";
 
@@ -18,87 +19,47 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
   const year = parseInt(sp.year || `${now.getFullYear()}`, 10);
   const quarter = (sp.q as "Q1" | "Q2" | "Q3" | "Q4") || (`Q${defaultNext}` as "Q1" | "Q2" | "Q3" | "Q4");
 
-  const planned = planQuarter(brand, year, quarter);
+  // Money (budget/KPIs/channels) intentionally dropped — the studio stays design-first.
+  const proposals: Proposal[] = planQuarter(brand, year, quarter).map((p, i) => ({
+    id: String(i),
+    name: p.name,
+    objective: p.objective,
+    audience: p.audience,
+    productFocus: p.productFocus,
+    rationale: p.rationale,
+    ideas: p.ideas,
+  }));
 
   return (
-    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-10">
+    <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-8">
+      <SyncActiveBrand brandId={brand.id} />
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
         <div>
-          <Eyebrow>{brand.name}</Eyebrow>
-          <h1 className="serif text-display-lg mt-1 tracking-tight">Quarterly plan · {quarter} {year}</h1>
+          <Eyebrow>{brand.name} · planner</Eyebrow>
+          <h1 className="serif text-display-lg mt-1 tracking-tight">Draft a few projects</h1>
           <p className="text-ink-300 mt-2 max-w-2xl">
-            Three campaigns. One per objective. Each comes with audience, channels, KPIs, and four idea seeds you can edit or replace.
+            A starting set for {quarter} {year} — one to build awareness, one to nurture, one to convert. Rename them, drop what
+            you don't want, then add the rest to your Studio. You can always create projects by hand too.
           </p>
         </div>
         <PlannerControls slug={brand.slug} currentQ={quarter} currentYear={year} />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-5">
-        {planned.map((p, i) => (
-          <Card key={i} className="p-6 space-y-5">
-            <div>
-              <Badge tone="info">{p.objective}</Badge>
-              <div className="serif text-2xl mt-3 tracking-tight">{p.name}</div>
-              <div className="text-xs text-ink-400 mt-1">{p.audience}</div>
-            </div>
+      <PlannerWorkspace brandId={brand.id} proposals={proposals} />
 
-            <div>
-              <Eyebrow>Rationale</Eyebrow>
-              <p className="text-sm text-ink-200 mt-2 leading-relaxed">{p.rationale}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <Eyebrow>Channels</Eyebrow>
-                <div className="mt-1 text-ink-200">{p.channels.join(", ")}</div>
-              </div>
-              <div>
-                <Eyebrow>Budget</Eyebrow>
-                <div className="mt-1 text-ink-200">${p.budget.toLocaleString()}</div>
-              </div>
-              <div>
-                <Eyebrow>Product focus</Eyebrow>
-                <div className="mt-1 text-ink-200">{p.productFocus.join(" · ")}</div>
-              </div>
-              <div>
-                <Eyebrow>KPIs</Eyebrow>
-                <div className="mt-1 text-ink-200">{p.kpis.join(" · ")}</div>
-              </div>
-            </div>
-
-            <div>
-              <Eyebrow>Idea seeds</Eyebrow>
-              <ul className="space-y-3 mt-2">
-                {p.ideas.map((idea, j) => (
-                  <li key={j} className="rounded-lg ring-1 ring-white/5 bg-ink-900/60 p-3">
-                    <div className="serif text-base">{idea.theme}</div>
-                    <div className="text-xs text-ink-400 mt-1">{idea.angle} · {idea.audience}</div>
-                    <div className="text-xs text-ink-200 mt-2 line-clamp-2">{idea.insight}</div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Card>
-        ))}
-      </div>
-
-      <Section title="Accept the plan?" subtitle="Adds these as projects under this brand. You can open any one of them right after.">
-        <AcceptPlanForm brandId={brand.id} year={year} quarter={quarter} />
-      </Section>
-
-      <Section title="What the planner considers">
+      <Section title="How the planner thinks">
         <Card className="p-6 grid md:grid-cols-3 gap-6 text-sm">
           <div>
-            <Eyebrow>Seasonal mood</Eyebrow>
-            <p className="text-ink-200 mt-2">Each quarter gets a mood — renewal, outward, abundant, gathered. Themes are pulled from that mood, then bent toward the brand's voice.</p>
+            <Eyebrow>A seasonal mood</Eyebrow>
+            <p className="text-ink-200 mt-2">Each quarter has a feel — renewal, outward, abundant, gathered. Themes start there, then bend toward your brand's voice.</p>
           </div>
           <div>
-            <Eyebrow>Objective coverage</Eyebrow>
-            <p className="text-ink-200 mt-2">One awareness, one consideration, one conversion project — so the work builds correctly across the quarter.</p>
+            <Eyebrow>A natural arc</Eyebrow>
+            <p className="text-ink-200 mt-2">One project to get noticed, one to build interest, one to convert — so the work compounds across the season.</p>
           </div>
           <div>
-            <Eyebrow>Audience layering</Eyebrow>
-            <p className="text-ink-200 mt-2">Audiences come from the industry's pre-baked profiles, then re-sampled per idea so no two ideas in a project share the same audience.</p>
+            <Eyebrow>Layered audiences</Eyebrow>
+            <p className="text-ink-200 mt-2">Audiences are drawn from your industry's profiles, then varied per idea so no two ideas chase the same person.</p>
           </div>
         </Card>
       </Section>

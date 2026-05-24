@@ -40,7 +40,7 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
           <div className="flex flex-col items-end gap-3">
             <div className="flex gap-2">
               <LinkButton href={`/brands/${brand.slug}/identity`} variant="secondary" size="sm">Edit identity</LinkButton>
-              <LinkButton href={`/brands/${brand.slug}/plan`} variant="secondary" size="sm">Plan a quarter</LinkButton>
+              <LinkButton href={`/brands/${brand.slug}/plan`} variant="secondary" size="sm">Planner</LinkButton>
               <LinkButton href="/campaigns" variant="secondary" size="sm">Open Studio</LinkButton>
             </div>
             <div className="flex items-center gap-2">
@@ -84,12 +84,15 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
       <Section
         title="Studio projects"
         subtitle="A project holds a brief, its ideas, and the creatives they produce."
-        action={<LinkButton href={`/brands/${brand.slug}/plan`} variant="ghost" size="sm">Plan another quarter →</LinkButton>}
+        action={<LinkButton href="/campaigns" variant="ghost" size="sm">All projects →</LinkButton>}
       >
         {projects.length === 0 ? (
           <Empty title="No projects yet">
-            Plan a quarter and Augen drafts three projects to start from.
-            <div className="mt-4"><LinkButton href={`/brands/${brand.slug}/plan`}>Plan a quarter →</LinkButton></div>
+            Open the Studio to create one, or let the Planner draft a few to start from.
+            <div className="mt-4 flex gap-2 justify-center">
+              <LinkButton href="/campaigns">Open Studio →</LinkButton>
+              <LinkButton href={`/brands/${brand.slug}/plan`} variant="ghost">Planner</LinkButton>
+            </div>
           </Empty>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">

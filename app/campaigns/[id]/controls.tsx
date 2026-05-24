@@ -1,9 +1,42 @@
 "use client";
-import { Button, Card, Eyebrow, Label } from "@/components/ui/primitives";
+import { Button, Card, Eyebrow, Input, Label } from "@/components/ui/primitives";
 import type { Campaign } from "@/lib/types";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { runCampaignAction, saveBriefAction, saveFormatLabelAction } from "./actions";
+import { renameProjectAction, deleteProjectAction } from "../actions";
 import type { FormatSpec } from "@/lib/formats";
+
+export function ProjectDetailActions({ campaignId, name }: { campaignId: string; name: string }) {
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(name);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  function rename() {
+    const v = draft.trim();
+    if (!v || v === name) { setRenaming(false); return; }
+    start(async () => { await renameProjectAction(campaignId, v); setRenaming(false); router.refresh(); });
+  }
+  function remove() {
+    if (!confirm(`Delete "${name}"? Its ideas and creatives are removed too. This can't be undone.`)) return;
+    start(async () => { await deleteProjectAction(campaignId); router.push("/campaigns"); });
+  }
+  if (renaming) {
+    return (
+      <div className="flex items-center gap-2">
+        <Input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") rename(); if (e.key === "Escape") setRenaming(false); }} className="text-sm h-9" autoFocus />
+        <Button size="sm" onClick={rename} disabled={pending}>Save</Button>
+        <button onClick={() => setRenaming(false)} className="text-xs text-ink-400 hover:text-ink-100">Cancel</button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 text-xs text-ink-400">
+      <button onClick={() => { setDraft(name); setRenaming(true); }} className="hover:text-ink-100">Rename</button>
+      <button onClick={remove} className="hover:text-rose-300" disabled={pending}>Delete project</button>
+    </div>
+  );
+}
 
 export function RunCampaignButton({ campaignId, ideaCount }: { campaignId: string; ideaCount: number }) {
   const [pending, start] = useTransition();

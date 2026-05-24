@@ -248,6 +248,7 @@ function migrate(d: Database.Database) {
   try { d.prepare("ALTER TABLE generations ADD COLUMN height_override INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE brands ADD COLUMN language TEXT").run(); } catch {}
   try { d.prepare("ALTER TABLE brands ADD COLUMN figma_file_url TEXT").run(); } catch {}
+  try { d.prepare("ALTER TABLE brands ADD COLUMN copy_schema TEXT").run(); } catch {}
   // Detailed usage tracking columns on agent_runs (additive — older rows have nulls)
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_create_tokens INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_read_tokens INTEGER").run(); } catch {}

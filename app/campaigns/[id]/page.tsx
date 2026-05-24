@@ -4,7 +4,7 @@ import { ALL_FORMATS, formatBySlug, formatsByPlatform } from "@/lib/formats";
 import { notFound } from "next/navigation";
 import { AdPreview } from "@/components/ad-preview";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
-import { RunCampaignButton, BriefEditor } from "./controls";
+import { RunCampaignButton, BriefEditor, ProjectDetailActions } from "./controls";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
           <div>
             <h1 className="serif text-display-lg tracking-tight">{campaign.name}</h1>
-            <div className="text-ink-300 mt-1">{campaign.quarter} {campaign.year} · {campaign.objective} · {campaign.audience}</div>
+            <div className="text-ink-300 mt-1">{[campaign.quarter && `${campaign.quarter} ${campaign.year}`, campaign.objective, campaign.audience].filter(Boolean).join(" · ") || "Draft project"}</div>
+            <div className="mt-2"><ProjectDetailActions campaignId={campaign.id} name={campaign.name} /></div>
           </div>
           <div className="flex items-center gap-3">
             <Badge tone={campaign.status === "approved" ? "ok" : campaign.status === "ready_for_review" ? "info" : "neutral"}>

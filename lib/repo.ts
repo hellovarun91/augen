@@ -1,6 +1,7 @@
 import { db, nowMs } from "./db";
 import { nanoid } from "nanoid";
 import { BrandLanguage, BrandTokens, type Brand, type BrandRow, type Campaign, type CampaignRow, type CampaignBrief, type Generation, type GenerationRow, type Idea, type IdeaRow } from "./types";
+import { parseCopySchema, type CopySchema } from "./copy-schema";
 
 export function listBrands(): Brand[] {
   const rows = db().prepare("SELECT * FROM brands ORDER BY created_at DESC").all() as BrandRow[];
@@ -165,6 +166,26 @@ export function listAllCampaigns(): Campaign[] {
 
 export function setCampaignStatus(id: string, status: string) {
   db().prepare("UPDATE campaigns SET status = ?, updated_at = ? WHERE id = ?").run(status, nowMs(), id);
+}
+
+export function renameCampaign(id: string, name: string) {
+  db().prepare("UPDATE campaigns SET name = ?, updated_at = ? WHERE id = ?").run(name, nowMs(), id);
+}
+
+export function updateCampaignBasics(id: string, patch: { name?: string; objective?: string; audience?: string }) {
+  const c = getCampaign(id);
+  if (!c) return;
+  const name = patch.name?.trim() || c.name;
+  const objective = patch.objective ?? c.objective ?? "";
+  const audience = patch.audience ?? c.audience ?? "";
+  const brief = { ...c.brief, objective, audience };
+  db().prepare("UPDATE campaigns SET name = ?, objective = ?, audience = ?, brief = ?, updated_at = ? WHERE id = ?")
+    .run(name, objective, audience, JSON.stringify(brief), nowMs(), id);
+}
+
+// Children (ideas, generations, formats, variation batches) cascade-delete via FK.
+export function deleteCampaign(id: string) {
+  db().prepare("DELETE FROM campaigns WHERE id = ?").run(id);
 }
 
 // ---------- Ideas ----------
@@ -390,6 +411,17 @@ export function deleteReference(id: string) {
 
 export function toggleReferenceSelected(id: string, selected: boolean) {
   db().prepare("UPDATE references_ SET selected = ? WHERE id = ?").run(selected ? 1 : 0, id);
+}
+
+// ---------- Brand copy schema (Copy Sheet columns) ----------
+
+export function getCopySchema(brandId: string): CopySchema {
+  const row = db().prepare("SELECT copy_schema FROM brands WHERE id = ?").get(brandId) as { copy_schema: string | null } | undefined;
+  return parseCopySchema(row?.copy_schema ? JSON.parse(row.copy_schema) : null);
+}
+
+export function setCopySchema(brandId: string, schema: CopySchema) {
+  db().prepare("UPDATE brands SET copy_schema = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(schema), nowMs(), brandId);
 }
 
 // ---------- Brand assets (logo / icon / badge bank) ----------

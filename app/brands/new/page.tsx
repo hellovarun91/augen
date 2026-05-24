@@ -42,7 +42,7 @@ export default function NewBrandPage() {
         <ol className="grid md:grid-cols-2 gap-4">
           {[
             ["1.", "A full token system — palette, typography, scrim, voice, imagery treatment."],
-            ["2.", "A drafted quarterly plan with 3 projects and 12 idea seeds."],
+            ["2.", "A starter set of 3 projects and 12 idea seeds, ready to shape."],
             ["3.", "Format coverage across Meta, Google, LinkedIn, Pinterest, TikTok, X, Snap, Reddit."],
           ].map(([n, t]) => (
             <li key={n as string} className="rounded-xl ring-1 ring-white/5 p-4 bg-ink-900/60">
