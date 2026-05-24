@@ -1,8 +1,10 @@
 import { Badge, Card, Empty, Eyebrow, LinkButton, Section, Stat } from "@/components/ui/primitives";
-import { getBrandBySlug, listCampaignsByBrand, listGenerationsByCampaign } from "@/lib/repo";
+import { getBrandBySlug, listCampaignsByBrand, listGenerationsByCampaign, listAssets, listReferences, listExternalWinners } from "@/lib/repo";
 import { formatBySlug } from "@/lib/formats";
 import { AdPreview, AdPreviewPreview } from "@/components/ad-preview";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
+import { RefineWithAI } from "@/components/refine-with-ai";
+import { foundationStrength } from "@/lib/brand-strength";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { relativeDate } from "@/lib/utils";
@@ -17,6 +19,15 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
   const gens = projects.flatMap((c) => listGenerationsByCampaign(c.id));
   const pending = gens.filter((g) => g.status === "pending_review");
   const approved = gens.filter((g) => g.status === "approved");
+
+  const strength = foundationStrength(brand, {
+    assets: listAssets(brand.id).length,
+    references: listReferences(brand.id).length,
+    winners: listExternalWinners(brand.id).length,
+  });
+  const gaps = strength.items.filter((i) => !i.done);
+  const bandTone = strength.band === "strong" ? "ok" : strength.band === "solid" ? "info" : strength.band === "forming" ? "warn" : "danger";
+  const bandColor = strength.band === "strong" ? "#34d399" : strength.band === "solid" ? "#60a5fa" : strength.band === "forming" ? "#fbbf24" : "#fb7185";
 
   const previewFormats = ["meta-feed-1x1", "meta-feed-4x5", "meta-story-9x16", "google-display-300x600"];
 
@@ -58,6 +69,57 @@ export default async function BrandPage({ params }: { params: Promise<{ slug: st
         <Card className="p-5"><Stat label="Pending review" value={pending.length} /></Card>
         <Card className="p-5"><Stat label="Approved" value={approved.length} /></Card>
       </div>
+
+      <Section
+        title="Foundation"
+        subtitle="How complete the brand system is — and how to make it sharper. Then refine it in plain language."
+      >
+        <div className="grid lg:grid-cols-2 gap-5">
+          <Card className="p-6 space-y-5">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <Eyebrow>Strength</Eyebrow>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="serif text-4xl tracking-tight" style={{ color: bandColor }}>{strength.score}</span>
+                  <span className="text-ink-400 text-sm">/ 100</span>
+                  <Badge tone={bandTone as any}>{strength.band}</Badge>
+                </div>
+              </div>
+            </div>
+            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${strength.score}%`, background: bandColor }} />
+            </div>
+            {gaps.length === 0 ? (
+              <div className="text-sm text-ink-300">Every part of the foundation is filled in. The agents have everything they need.</div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-[11px] uppercase tracking-wider text-ink-500">Make it stronger</div>
+                <ul className="space-y-1.5">
+                  {gaps.slice(0, 6).map((g) => (
+                    <li key={g.id}>
+                      <Link href={g.href} className="group flex items-start gap-2 text-sm">
+                        <span className="text-ink-600 mt-0.5">○</span>
+                        <span>
+                          <span className="text-ink-100 group-hover:text-white">{g.label}</span>
+                          <span className="text-ink-400"> — {g.hint}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+
+          <Card className="p-6 space-y-4">
+            <div>
+              <Eyebrow>Refine with AI</Eyebrow>
+              <p className="text-sm text-ink-300 mt-1">Adjust the system in plain language. Preview before it touches anything.</p>
+            </div>
+            <RefineWithAI brandId={brand.id} currentPalette={brand.tokens.palette} currentTone={brand.tokens.voice.tone} />
+          </Card>
+        </div>
+      </Section>
 
       {pending.length > 0 && (
         <Section
