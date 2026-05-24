@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getBrand } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
+import { brandLogo } from "@/lib/composer/logo";
 import { formatBySlug } from "@/lib/formats";
 import { hashStr } from "@/lib/ai/rand";
 
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
     width: fmt.width, height: fmt.height, aspect: fmt.aspect,
     tokens: brand.tokens, copy, seed,
     style: brand.tokens.imagery.style,
+    logo: brandLogo(brand.id),
   });
   return new Response(svg, {
     headers: { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-cache" },

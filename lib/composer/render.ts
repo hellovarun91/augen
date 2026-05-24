@@ -21,6 +21,9 @@ export interface RenderArgs {
   bareBackground?: boolean;
   referenceUrl?: string; // public path like /refs/foo.jpg, embeds into the SVG
   overrides?: AdOverrides;
+  // Primary brand logo (data-URI) for the locker; inverseHref is the light/
+  // knockout variant used on dark backgrounds. Falls back to the text wordmark.
+  logo?: { href: string; inverseHref?: string };
 }
 
 export function renderAdSvg(args: RenderArgs): string {
@@ -63,7 +66,9 @@ export function renderAdSvg(args: RenderArgs): string {
   };
 
   const lockerVisible = (ov?.layout?.lockerVisible !== false) && args.showLocker !== false;
-  const text = buildText(layout, tokens, copy, colors, ov, lockerVisible);
+  // On dark backgrounds prefer the inverse (light) logo; else the primary.
+  const lockerLogo = args.logo ? (onLight ? args.logo.href : (args.logo.inverseHref || args.logo.href)) : null;
+  const text = buildText(layout, tokens, copy, colors, ov, lockerVisible, lockerLogo);
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet">
@@ -130,6 +135,7 @@ function buildText(
   colors: { eyebrow: string; headline: string; subhead: string; cta: string; rule: string; accent: string },
   ov: AdOverrides | undefined,
   showLocker: boolean,
+  lockerLogo: string | null,
 ): string {
   const displayFamily = escapeAttr(tokens.fonts.display);
   const bodyFamily = escapeAttr(tokens.fonts.body);
@@ -163,9 +169,23 @@ function buildText(
   const ctaAnchor = layout.cta.x > layout.width / 2 + 20 ? "end" : "start";
   const cta = `<text x="${layout.cta.x}" y="${layout.cta.y}" font-family='${bodyFamily}' font-size="${layout.cta.size}" font-weight="600" text-anchor="${ctaAnchor}" fill="${colors.cta}">${escapeXml(copy.cta)} →</text>`;
 
-  const locker = showLocker
-    ? `<text x="${layout.locker.x}" y="${layout.locker.y}" font-family='${bodyFamily}' font-size="${layout.locker.size}" font-weight="700" letter-spacing="${(0.16 * layout.locker.size).toFixed(2)}" fill="${colors.headline}">${escapeXml(tokens.locker.wordmark)}</text>`
-    : "";
+  let locker = "";
+  if (showLocker) {
+    if (lockerLogo) {
+      // Logo composited into the locker. preserveAspectRatio fits it within a
+      // bounding box (no need to know the file's intrinsic dimensions),
+      // bottom-aligned to the wordmark baseline and aligned to the locker edge.
+      const boxH = Math.round(layout.locker.size * 1.7);
+      const boxW = Math.min(Math.round(layout.width * 0.5), boxH * 7);
+      const right = layout.locker.align === "right";
+      const lx = right ? layout.locker.x - boxW : layout.locker.x;
+      const ly = layout.locker.y - boxH;
+      const par = right ? "xMaxYMax meet" : "xMinYMax meet";
+      locker = `<image x="${lx}" y="${ly}" width="${boxW}" height="${boxH}" preserveAspectRatio="${par}" href="${lockerLogo}"/>`;
+    } else {
+      locker = `<text x="${layout.locker.x}" y="${layout.locker.y}" font-family='${bodyFamily}' font-size="${layout.locker.size}" font-weight="700" letter-spacing="${(0.16 * layout.locker.size).toFixed(2)}" fill="${colors.headline}">${escapeXml(tokens.locker.wordmark)}</text>`;
+    }
+  }
 
   return [eyebrow, rule, headline, subhead, cta, locker].join("\n");
 }

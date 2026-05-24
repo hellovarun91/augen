@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getBrand, getGeneration, getGenerationOverrides, getReference } from "@/lib/repo";
 import { renderAdSvg } from "@/lib/composer/render";
+import { brandLogo } from "@/lib/composer/logo";
 import { rasterizeSvg } from "@/lib/composer/rasterize";
 import { db } from "@/lib/db";
 import { parseOverrides } from "@/lib/composer/overrides";
@@ -29,6 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     tokens: brand.tokens, copy: { eyebrow: gen.eyebrow || undefined, headline: gen.headline, subhead: gen.subhead || "", cta: gen.cta },
     seed: gen.image_seed, style: gen.image_style || brand.tokens.imagery.style,
     referenceUrl: effectiveRefUrl, overrides,
+    logo: brandLogo(brand.id),
   });
 
   const png = await rasterizeSvg(svg, { width: Math.min(gen.width, 2048), inlineReferences: true });
