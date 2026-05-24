@@ -12,40 +12,12 @@ const BRAND_SECTIONS: Array<{ seg: string; label: string }> = [
   { seg: "", label: "Overview" },
   { seg: "identity", label: "Identity" },
   { seg: "language", label: "Voice" },
-  { seg: "copy", label: "Copy" },
   { seg: "tokens", label: "Design tokens" },
   { seg: "assets", label: "Assets" },
   { seg: "references", label: "References" },
   { seg: "winners", label: "Winners" },
   { seg: "plan", label: "Planner" },
 ];
-
-function brandTabs(slug: string, pathname: string): NavTab[] {
-  const base = `/brands/${slug}`;
-  return BRAND_SECTIONS.map(({ seg, label }) => {
-    const href = seg ? `${base}/${seg}` : base;
-    let active: boolean;
-    if (seg === "tokens") {
-      // Design tokens groups the editor, artwork extraction, and Figma sync.
-      active = pathname.startsWith(`${base}/tokens`) || pathname.startsWith(`${base}/figma`);
-    } else if (seg === "") {
-      active = pathname === base;
-    } else {
-      active = pathname.startsWith(href);
-    }
-    return { label, href, active };
-  });
-}
-
-function projectTabs(id: string, pathname: string): NavTab[] {
-  const base = `/campaigns/${id}`;
-  const items = [
-    { label: "Overview", href: base, exact: true },
-    { label: "Agent chain", href: `${base}/agents`, exact: false },
-    { label: "Deliverables", href: `${base}/deliverables`, exact: false },
-  ];
-  return items.map((t) => ({ label: t.label, href: t.href, active: t.exact ? pathname === t.href : pathname.startsWith(t.href) }));
-}
 
 export async function getAppNav(): Promise<AppNav> {
   const h = await headers();
@@ -91,10 +63,11 @@ export async function getAppNav(): Promise<AppNav> {
       crumbs.push({ label: "Agent chain" });
     } else if (pathname.includes("/deliverables")) {
       crumbs.push({ label: "Deliverables" });
+    } else if (pathname.includes("/copy")) {
+      crumbs.push({ label: "Copy" });
     }
     // Mark the project crumb (second-to-last when deeper) non-current; last crumb stays current.
     if (crumbs.length) delete crumbs[crumbs.length - 1].href;
-    tabs = projectTabs(camp[1], pathname);
     return { crumbs, tabs };
   }
 
@@ -136,13 +109,14 @@ export async function getAppNav(): Promise<AppNav> {
       } else if (top === "figma") {
         crumbs.push({ label: "Design tokens", href: `/brands/${slug}/tokens` });
         crumbs.push({ label: "Figma sync" });
+      } else if (top === "copy") {
+        crumbs.push({ label: "Default copy structure" });
       } else {
         const match = BRAND_SECTIONS.find((s) => s.seg === top);
         crumbs.push({ label: match?.label || top });
       }
     }
     if (crumbs.length) delete crumbs[crumbs.length - 1].href;
-    tabs = brandTabs(slug, pathname);
     return { crumbs, tabs };
   }
 

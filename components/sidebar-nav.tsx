@@ -27,6 +27,8 @@ export function SidebarNav({
   const inBrand = !!pathSlug || path.startsWith("/campaigns") || path.startsWith("/ads/") || path.startsWith("/review");
   const b = inBrand ? (pathSlug || stickySlug || contextBrand?.slug || null) : null;
   const onTokens = !!b && (path.startsWith(`/brands/${b}/tokens`) || path.startsWith(`/brands/${b}/figma`));
+  // Inside a specific project → show its sub-pages under Projects.
+  const projId = (() => { const m = path.match(/^\/campaigns\/([^/]+)/); return m ? m[1] : null; })();
 
   return (
     <div className="flex-1 flex flex-col">
@@ -40,7 +42,6 @@ export function SidebarNav({
             <NavItem href={`/brands/${b}`} label="Overview" active={path === `/brands/${b}`} />
             <NavItem href={`/brands/${b}/identity`} label="Identity" active={path.startsWith(`/brands/${b}/identity`)} />
             <NavItem href={`/brands/${b}/language`} label="Voice" active={path.startsWith(`/brands/${b}/language`)} />
-            <NavItem href={`/brands/${b}/copy`} label="Copy" active={path.startsWith(`/brands/${b}/copy`)} />
             <NavItem href={`/brands/${b}/tokens`} label="Design tokens" active={path === `/brands/${b}/tokens`} />
             {onTokens && (
               <>
@@ -55,7 +56,15 @@ export function SidebarNav({
 
           <Section label="Studio">
             <NavItem href={`/brands/${b}/plan`} label="Planner" active={path.startsWith(`/brands/${b}/plan`)} />
-            <NavItem href="/campaigns" label="Projects" active={path === "/campaigns" || path.startsWith("/campaigns/")} />
+            <NavItem href="/campaigns" label="Projects" active={path === "/campaigns"} />
+            {projId && (
+              <>
+                <NavItem href={`/campaigns/${projId}`} label="Overview" active={path === `/campaigns/${projId}`} sub />
+                <NavItem href={`/campaigns/${projId}/copy`} label="Copy" active={path.startsWith(`/campaigns/${projId}/copy`)} sub />
+                <NavItem href={`/campaigns/${projId}/agents`} label="Agent chain" active={path.startsWith(`/campaigns/${projId}/agents`)} sub />
+                <NavItem href={`/campaigns/${projId}/deliverables`} label="Deliverables" active={path.startsWith(`/campaigns/${projId}/deliverables`)} sub />
+              </>
+            )}
             <NavItem href="/review" label="Review" active={path.startsWith("/review")} />
           </Section>
         </>

@@ -43,7 +43,6 @@ export function MobileNav({
         { href: `/brands/${b}`, label: "Overview" },
         { href: `/brands/${b}/identity`, label: "Identity" },
         { href: `/brands/${b}/language`, label: "Voice" },
-        { href: `/brands/${b}/copy`, label: "Copy" },
         { href: `/brands/${b}/tokens`, label: "Design tokens" },
         { href: `/brands/${b}/tokens/extract`, label: "Extract from artwork" },
         { href: `/brands/${b}/figma`, label: "Figma sync" },
@@ -53,10 +52,17 @@ export function MobileNav({
       ]
     : [];
 
+  const projId = (() => { const m = path.match(/^\/campaigns\/([^/]+)/); return m ? m[1] : null; })();
   const studioNav = b
     ? [
         { href: `/brands/${b}/plan`, label: "Planner" },
         { href: "/campaigns", label: "Projects" },
+        ...(projId ? [
+          { href: `/campaigns/${projId}`, label: "· Overview" },
+          { href: `/campaigns/${projId}/copy`, label: "· Copy" },
+          { href: `/campaigns/${projId}/agents`, label: "· Agent chain" },
+          { href: `/campaigns/${projId}/deliverables`, label: "· Deliverables" },
+        ] : []),
         { href: "/review", label: "Review" },
       ]
     : [];

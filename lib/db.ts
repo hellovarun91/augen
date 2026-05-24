@@ -249,6 +249,7 @@ function migrate(d: Database.Database) {
   try { d.prepare("ALTER TABLE brands ADD COLUMN language TEXT").run(); } catch {}
   try { d.prepare("ALTER TABLE brands ADD COLUMN figma_file_url TEXT").run(); } catch {}
   try { d.prepare("ALTER TABLE brands ADD COLUMN copy_schema TEXT").run(); } catch {}
+  try { d.prepare("ALTER TABLE campaigns ADD COLUMN copy_schema TEXT").run(); } catch {}
   // Detailed usage tracking columns on agent_runs (additive — older rows have nulls)
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_create_tokens INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_read_tokens INTEGER").run(); } catch {}
@@ -454,6 +455,18 @@ function migrate(d: Database.Database) {
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS brand_assets_brand_idx ON brand_assets(brand_id);
+
+  -- Copy Sheet rows — per-project copy, keyed by the project's columns.
+  CREATE TABLE IF NOT EXISTS copy_rows (
+    id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+    brand_id TEXT NOT NULL,
+    values_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'draft',
+    order_idx INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS copy_rows_campaign_idx ON copy_rows(campaign_id);
   `);
 }
 

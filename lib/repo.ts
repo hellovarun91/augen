@@ -1,7 +1,7 @@
 import { db, nowMs } from "./db";
 import { nanoid } from "nanoid";
 import { BrandLanguage, BrandTokens, type Brand, type BrandRow, type Campaign, type CampaignRow, type CampaignBrief, type Generation, type GenerationRow, type Idea, type IdeaRow } from "./types";
-import { parseCopySchema, type CopySchema } from "./copy-schema";
+import { parseCopySchema, defaultCopySchema, type CopySchema } from "./copy-schema";
 
 export function listBrands(): Brand[] {
   const rows = db().prepare("SELECT * FROM brands ORDER BY created_at DESC").all() as BrandRow[];
@@ -422,6 +422,53 @@ export function getCopySchema(brandId: string): CopySchema {
 
 export function setCopySchema(brandId: string, schema: CopySchema) {
   db().prepare("UPDATE brands SET copy_schema = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(schema), nowMs(), brandId);
+}
+
+// A project's columns inherit the brand default until the project overrides them.
+export function getProjectCopySchema(campaignId: string): CopySchema {
+  const row = db().prepare("SELECT brand_id, copy_schema FROM campaigns WHERE id = ?").get(campaignId) as { brand_id: string; copy_schema: string | null } | undefined;
+  if (!row) return defaultCopySchema();
+  if (row.copy_schema) return parseCopySchema(JSON.parse(row.copy_schema));
+  return getCopySchema(row.brand_id);
+}
+
+export function setProjectCopySchema(campaignId: string, schema: CopySchema) {
+  db().prepare("UPDATE campaigns SET copy_schema = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(schema), nowMs(), campaignId);
+}
+
+// ---------- Copy Sheet rows ----------
+
+export interface CopyRow {
+  id: string; campaign_id: string; brand_id: string;
+  values: Record<string, string>; status: string; order_idx: number; created_at: number;
+}
+
+function hydrateCopyRow(r: any): CopyRow {
+  return { ...r, values: r.values_json ? JSON.parse(r.values_json) : {} };
+}
+
+export function listCopyRows(campaignId: string): CopyRow[] {
+  return (db().prepare("SELECT * FROM copy_rows WHERE campaign_id = ? ORDER BY order_idx ASC, created_at ASC").all(campaignId) as any[]).map(hydrateCopyRow);
+}
+
+export function createCopyRow(campaignId: string, brandId: string, values: Record<string, string> = {}): CopyRow {
+  const id = `crow_${nanoid(10)}`;
+  const max = db().prepare("SELECT COALESCE(MAX(order_idx), -1) m FROM copy_rows WHERE campaign_id = ?").get(campaignId) as { m: number };
+  db().prepare("INSERT INTO copy_rows (id, campaign_id, brand_id, values_json, status, order_idx, created_at) VALUES (?, ?, ?, ?, 'draft', ?, ?)")
+    .run(id, campaignId, brandId, JSON.stringify(values), max.m + 1, nowMs());
+  return hydrateCopyRow(db().prepare("SELECT * FROM copy_rows WHERE id = ?").get(id));
+}
+
+export function updateCopyRow(id: string, patch: { values?: Record<string, string>; status?: string }) {
+  const cur = db().prepare("SELECT * FROM copy_rows WHERE id = ?").get(id) as any;
+  if (!cur) return;
+  const values = patch.values ? JSON.stringify(patch.values) : cur.values_json;
+  const status = patch.status ?? cur.status;
+  db().prepare("UPDATE copy_rows SET values_json = ?, status = ? WHERE id = ?").run(values, status, id);
+}
+
+export function deleteCopyRow(id: string) {
+  db().prepare("DELETE FROM copy_rows WHERE id = ?").run(id);
 }
 
 // ---------- Brand assets (logo / icon / badge bank) ----------
