@@ -3,8 +3,9 @@ import { recordRun, newChainId } from "./persistence";
 import { runStrategist } from "./strategist";
 import { runArtDirector } from "./art-director";
 import { runCopywriter } from "./copywriter";
-import { runCritic } from "./critic";
-import { formatBySlug } from "@/lib/formats";
+import { runCriticBatch } from "./critic";
+import type { ArtDirectorOutput, CopywriterOutput, CopyVariant, CriticOutput } from "./types";
+import { formatBySlug, type FormatSpec } from "@/lib/formats";
 import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference, createReference } from "@/lib/repo";
 import { generateImage, saveBytes } from "@/lib/images/providers";
 import type { AgentProvider } from "./types";
@@ -16,6 +17,13 @@ function currentProvider(): AgentProvider {
     : { name: "mock", model: "augen-mock@1" };
 }
 const COST_PER_AD_CENTS = 16;
+
+// How many ads the QC Critic scores per Claude call. The brand context is cached,
+// so a chunk costs roughly one ad's worth of input regardless of size.
+const CRITIC_BATCH_SIZE = (() => {
+  const v = parseInt(process.env.AUGEN_CRITIC_BATCH || "", 10);
+  return Number.isFinite(v) && v > 0 ? v : 8;
+})();
 
 export interface GenerateChainResult {
   chainId: string;
@@ -43,26 +51,37 @@ export async function generateAdsViaAgents(args: {
   const chainId = newChainId();
   setCampaignStatus(args.campaignId, "generating");
 
+  const provider = currentProvider();
   const copyRunIds: string[] = [];
   const artRunIds: string[] = [];
   const criticRunIds: string[] = [];
-  let count = 0;
+
+  // ---- Phase 1: Art Director + Copywriter per ad. Defer critique so it batches.
+  type PendingAd = {
+    idea: Idea;
+    fmt: FormatSpec;
+    formatSlug: string;
+    v: number;
+    art: ArtDirectorOutput;
+    variants: CopyVariant[];
+    chosen: CopyVariant;
+  };
+  const pending: PendingAd[] = [];
 
   for (const idea of ideas.filter((i) => i.selected)) {
     for (const formatSlug of args.brief.formats) {
       const fmt = formatBySlug(formatSlug);
       if (!fmt) continue;
       for (let v = 0; v < variantsPerFormat; v++) {
-        const product = args.brief.productFocus[count % Math.max(1, args.brief.productFocus.length)] || args.brand.name;
+        const product = args.brief.productFocus[pending.length % Math.max(1, args.brief.productFocus.length)] || args.brand.name;
 
-        // Art Director
         const art = await recordRun({
           kind: "art_director",
           chainId,
           brandId: args.brand.id,
           campaignId: args.campaignId,
           ideaId: idea.id,
-          provider: currentProvider(),
+          provider,
           input: { brandSlug: args.brand.slug, idea: idea.theme, product, formatSlug, variantIndex: v },
           fn: () => runArtDirector({
             brand: args.brand,
@@ -76,7 +95,6 @@ export async function generateAdsViaAgents(args: {
         });
         artRunIds.push(art.runId);
 
-        // Copywriter
         const copy = await recordRun({
           kind: "copywriter",
           chainId,
@@ -84,7 +102,7 @@ export async function generateAdsViaAgents(args: {
           brandId: args.brand.id,
           campaignId: args.campaignId,
           ideaId: idea.id,
-          provider: currentProvider(),
+          provider,
           input: { idea: idea.theme, product, formatSlug, count: 3, constraint: args.copyConstraint },
           fn: () => runCopywriter({
             brand: args.brand,
@@ -99,83 +117,91 @@ export async function generateAdsViaAgents(args: {
         });
         copyRunIds.push(copy.runId);
 
-        const chosen = copy.output.variants[0];
-
-        // Critic
-        const critique = await recordRun({
-          kind: "critic",
-          chainId,
-          parentRunId: copy.runId,
-          brandId: args.brand.id,
-          campaignId: args.campaignId,
-          ideaId: idea.id,
-          provider: currentProvider(),
-          input: { copy: chosen, formatSlug, idea: idea.theme },
-          fn: () => runCritic({
-            brand: args.brand,
-            language: args.brand.language,
-            copy: chosen,
-            formatSlug,
-            idea,
-          }),
-        });
-        criticRunIds.push(critique.runId);
-
-        // Persist the generation
-        const gen = createGeneration({
-          campaignId: args.campaignId,
-          ideaId: idea.id,
-          brandId: args.brand.id,
-          formatSlug,
-          aspect: fmt.aspect,
-          width: fmt.width,
-          height: fmt.height,
-          headline: chosen.headline,
-          subhead: chosen.subhead,
-          cta: chosen.cta,
-          eyebrow: chosen.eyebrow,
-          copy: copy.output.variants,
-          imagePrompt: art.output.imagePrompt,
-          imageSeed: art.output.seed,
-          imageStyle: art.output.styleKeyword,
-          palette: art.output.paletteEmphasis,
-          confidence: critique.output.score,
-          costCents: COST_PER_AD_CENTS,
-        });
-
-        // Mock billing
-        if (getBilling(args.brand.id)) {
-          chargeBilling(args.brand.id, COST_PER_AD_CENTS, `Generation · ${fmt.name}`, gen.id);
-        }
-
-        // Resolve a reference image for this generation.
-        // Priority: pre-loaded library refs (round-robin) > Gemini fresh generation > SVG fallback.
-        if (allRefs.length) {
-          const pickRef = allRefs[count % allRefs.length];
-          if (pickRef.file_path) updateGenerationReference(gen.id, pickRef.id);
-        } else if (process.env.GEMINI_API_KEY) {
-          const img = await generateImage(art.output.imagePrompt, fmt.aspect);
-          if (img) {
-            const saved = await saveBytes(args.brand.slug, img.bytes, img.mime);
-            const ref = createReference({
-              brandId: args.brand.id,
-              kind: "generated",
-              source: "gemini",
-              label: `Generated · ${idea.theme.slice(0, 40)} · ${fmt.aspect}`,
-              prompt: art.output.imagePrompt,
-              filePath: saved.publicPath,
-              mime: img.mime,
-              width: img.width,
-              height: img.height,
-              tags: [fmt.aspect, "gemini", `seed:${art.output.seed}`],
-            });
-            updateGenerationReference(gen.id, ref.id);
-          }
-        }
-
-        count++;
+        pending.push({ idea, fmt, formatSlug, v, art: art.output, variants: copy.output.variants, chosen: copy.output.variants[0] });
       }
     }
+  }
+
+  // ---- Phase 2: batch critique in chunks. One Claude call scores up to
+  // CRITIC_BATCH_SIZE ads against the (cached) brand context.
+  const critiques: CriticOutput[] = new Array(pending.length);
+  for (let start = 0; start < pending.length; start += CRITIC_BATCH_SIZE) {
+    const slice = pending.slice(start, start + CRITIC_BATCH_SIZE);
+    const batch = await recordRun({
+      kind: "critic",
+      chainId,
+      brandId: args.brand.id,
+      campaignId: args.campaignId,
+      provider,
+      input: { batch: slice.map((p) => ({ formatSlug: p.formatSlug, copy: p.chosen, idea: p.idea.theme })) },
+      fn: () => runCriticBatch({
+        brand: args.brand,
+        language: args.brand.language,
+        items: slice.map((p) => ({ formatSlug: p.formatSlug, copy: p.chosen, idea: p.idea })),
+      }),
+    });
+    criticRunIds.push(batch.runId);
+    batch.output.critiques.forEach((c, j) => { critiques[start + j] = c; });
+  }
+
+  // ---- Phase 3: persist each generation, bill, and resolve a reference image.
+  let count = 0;
+  for (let i = 0; i < pending.length; i++) {
+    const p = pending[i];
+    const critique = critiques[i] ?? { score: 0.7, voiceFit: 0.7, formatFit: 0.7, conceptStrength: 0.7, verdict: "revise" as const, notes: [] };
+
+    const gen = createGeneration({
+      campaignId: args.campaignId,
+      ideaId: p.idea.id,
+      brandId: args.brand.id,
+      formatSlug: p.formatSlug,
+      aspect: p.fmt.aspect,
+      width: p.fmt.width,
+      height: p.fmt.height,
+      headline: p.chosen.headline,
+      subhead: p.chosen.subhead,
+      cta: p.chosen.cta,
+      eyebrow: p.chosen.eyebrow,
+      copy: p.variants,
+      imagePrompt: p.art.imagePrompt,
+      imageSeed: p.art.seed,
+      imageStyle: p.art.styleKeyword,
+      palette: p.art.paletteEmphasis,
+      confidence: critique.score,
+      costCents: COST_PER_AD_CENTS,
+    });
+
+    // Mock billing
+    if (getBilling(args.brand.id)) {
+      chargeBilling(args.brand.id, COST_PER_AD_CENTS, `Generation · ${p.fmt.name}`, gen.id);
+    }
+
+    // Resolve a reference image for this generation.
+    // Priority: pre-loaded library refs (round-robin) > Gemini fresh generation > SVG fallback.
+    if (allRefs.length) {
+      const pickRef = allRefs[count % allRefs.length];
+      if (pickRef.file_path) updateGenerationReference(gen.id, pickRef.id);
+    } else if (process.env.GEMINI_API_KEY) {
+      const img = await generateImage(p.art.imagePrompt, p.fmt.aspect);
+      if (img) {
+        const saved = await saveBytes(args.brand.slug, img.bytes, img.mime);
+        const ref = createReference({
+          brandId: args.brand.id,
+          kind: "generated",
+          source: "gemini",
+          label: `Generated · ${p.idea.theme.slice(0, 40)} · ${p.fmt.aspect}`,
+          prompt: p.art.imagePrompt,
+          filePath: saved.publicPath,
+          mime: img.mime,
+          width: img.width,
+          height: img.height,
+          tags: [p.fmt.aspect, "gemini", `seed:${p.art.seed}`],
+        });
+        updateGenerationReference(gen.id, ref.id);
+      }
+    }
+
+    count++;
   }
 
   setCampaignStatus(args.campaignId, "ready_for_review");

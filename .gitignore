@@ -3,6 +3,7 @@ node_modules/
 .turbo/
 out/
 data/*.db*
+data/refs/
 .env
 .env.*
 !.env.example

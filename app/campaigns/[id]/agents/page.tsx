@@ -124,7 +124,18 @@ export default async function AgentChainPage({ params }: { params: Promise<{ id:
                             <div><span className="text-ink-200">Light:</span> {out.lighting}</div>
                           </div>
                         )}
-                        {out && r.kind === "critic" && (
+                        {out && r.kind === "critic" && Array.isArray(out.critiques) && (
+                          <div className="space-y-1.5 pt-1">
+                            <div className="text-[11px] text-ink-400">Batch QC · {out.critiques.length} ad{out.critiques.length === 1 ? "" : "s"}</div>
+                            {out.critiques.slice(0, 8).map((c: any, i: number) => (
+                              <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                                <Badge tone={c.verdict === "ship" ? "ok" : c.verdict === "kill" ? "danger" : "warn"}>{c.verdict}</Badge>
+                                <span className="text-ink-400 tabular-nums">v{Math.round((c.voiceFit || 0) * 100)} · f{Math.round((c.formatFit || 0) * 100)} · c{Math.round((c.conceptStrength || 0) * 100)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {out && r.kind === "critic" && !Array.isArray(out.critiques) && typeof out.voiceFit === "number" && (
                           <div className="grid grid-cols-3 gap-2 pt-1">
                             <Score label="voice" val={out.voiceFit} />
                             <Score label="format" val={out.formatFit} />

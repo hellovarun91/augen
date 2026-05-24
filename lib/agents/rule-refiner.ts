@@ -1,5 +1,5 @@
 import type { Brand } from "@/lib/types";
-import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import { agentSystem, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
 import { collectReviewerNotes } from "@/lib/repo";
 
 export interface RuleProposal {
@@ -28,14 +28,11 @@ export async function refineRulesFromReviews(brand: Brand): Promise<{ proposals:
     return { proposals: props, rationale: "Heuristic clustering (no Claude key).", provider: "mock" };
   }
 
-  const system = [
-    {
-      type: "text" as const,
-      text: `You are a brand systems editor. Look at the reviewer notes left on rejected or revision-flagged ads for this brand. Cluster recurring themes into a small set of concrete, ad-ready rules.\n\nReturn 3-7 proposals via the emit_rules tool. Each rule must be specific (not "be better"), short (one sentence), and ad-ready. Use kind="dont" for prohibitions, "do" for affirmative behaviors, "banned" for single words/phrases to avoid, "preferred" for words to promote.\n\nIf the notes are noisy or contradictory, prefer fewer high-confidence rules over many.`,
-      cache_control: { type: "ephemeral" as const },
-    },
-    brandSystemBlock(brand, brand.language),
-  ];
+  const system = agentSystem(
+    `You are a brand systems editor. Look at the reviewer notes left on rejected or revision-flagged ads for this brand. Cluster recurring themes into a small set of concrete, ad-ready rules.\n\nReturn 3-7 proposals via the emit_rules tool. Each rule must be specific (not "be better"), short (one sentence), and ad-ready. Use kind="dont" for prohibitions, "do" for affirmative behaviors, "banned" for single words/phrases to avoid, "preferred" for words to promote.\n\nIf the notes are noisy or contradictory, prefer fewer high-confidence rules over many.`,
+    brand,
+    brand.language,
+  );
 
   const userText = [
     "Reviewer notes (most recent first):",

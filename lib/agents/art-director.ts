@@ -1,6 +1,6 @@
 import type { ArtDirectorInput, ArtDirectorOutput } from "./types";
 import { hashStr, pick, rng } from "@/lib/ai/rand";
-import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import { agentSystem, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
 import type { AgentUsage } from "./persistence";
 
 const COMPOSITIONS = [
@@ -47,14 +47,11 @@ export async function runArtDirector(input: ArtDirectorInput): Promise<{ output:
 async function runArtDirectorClaude(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string; usage: AgentUsage }> {
   const client = getClaude()!;
   const lang = (input.brand as any).language;
-  const system = [
-    {
-      type: "text" as const,
-      text: `You are a brand Art Director. You direct a photographic image generator. Pick composition, lighting, subject, and palette emphasis that feel native to this brand. The output is a single image prompt the generator will follow literally — write it as crisp, specific direction. No marketing language. Avoid logos and text in the image.`,
-      cache_control: { type: "ephemeral" as const },
-    },
-    brandSystemBlock(input.brand, lang || (input.brand as any).tokens.voice),
-  ];
+  const system = agentSystem(
+    `You are a brand Art Director. You direct a photographic image generator. Pick composition, lighting, subject, and palette emphasis that feel native to this brand. The output is a single image prompt the generator will follow literally — write it as crisp, specific direction. No marketing language. Avoid logos and text in the image.`,
+    input.brand,
+    lang || (input.brand as any).tokens.voice,
+  );
 
   const userText = [
     `Idea theme: ${input.idea.theme}`,

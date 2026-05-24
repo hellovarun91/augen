@@ -1,6 +1,6 @@
 import type { CopyVariant, CopywriterInput, CopywriterOutput } from "./types";
 import { hashStr, pick, pickN, rng } from "@/lib/ai/rand";
-import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import { agentSystem, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
 import type { AgentUsage } from "./persistence";
 import { formatBySlug } from "@/lib/formats";
 
@@ -108,14 +108,11 @@ async function runCopywriterClaude(input: CopywriterInput): Promise<{ output: Co
   const formatCap = ratio >= 3 ? 28 : ratio >= 1.5 ? 42 : 60;
   const headlineMax = Math.min(limits.headlineMaxChars, formatCap);
 
-  const system = [
-    {
-      type: "text" as const,
-      text: `You are a brand copywriter. Write ad copy in the brand's voice. Each variant has: eyebrow (2-3 words, ALL CAPS allowed only here), headline (use \\n linebreaks for stacking on portrait/square), subhead (one sentence, under ~100 chars), CTA (verb-led, ≤4 words). Honor banned words strictly. Respect operator constraints. Never use exclamation marks unless the tone profile leans playful.`,
-      cache_control: { type: "ephemeral" as const },
-    },
-    brandSystemBlock(input.brand, input.language),
-  ];
+  const system = agentSystem(
+    `You are a brand copywriter. Write ad copy in the brand's voice. Each variant has: eyebrow (2-3 words, ALL CAPS allowed only here), headline (use \\n linebreaks for stacking on portrait/square), subhead (one sentence, under ~100 chars), CTA (verb-led, ≤4 words). Honor banned words strictly. Respect operator constraints. Never use exclamation marks unless the tone profile leans playful.`,
+    input.brand,
+    input.language,
+  );
 
   const userText = [
     `Idea theme: ${input.idea.theme}`,

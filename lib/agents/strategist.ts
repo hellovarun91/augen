@@ -1,6 +1,6 @@
 import type { StrategistInput, StrategistOutput } from "./types";
 import { hashStr, pick, pickN, rng } from "@/lib/ai/rand";
-import { brandSystemBlock, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
+import { agentSystem, claudeMaxTokens, claudeModel, extractToolUse, extractUsage, getClaude } from "./adapters/claude";
 import type { AgentUsage } from "./persistence";
 
 // Re-uses the planner's idea taxonomy but produces output as if a strategist agent reasoned about it.
@@ -41,14 +41,11 @@ export async function runStrategist(input: StrategistInput): Promise<{ output: S
 
 async function runStrategistClaude(input: StrategistInput): Promise<{ output: StrategistOutput; rationale: string; usage: AgentUsage }> {
   const client = getClaude()!;
-  const system = [
-    {
-      type: "text" as const,
-      text: `You are a brand strategist working in an editorial register. You write fewer, stronger ideas, never marketing puffery. Each idea must name a single insight, a specific audience, a promise (what the work will do for the audience), an angle, and a visual direction.\n\nReturn ideas via the emit_ideas tool. Each idea's "theme" should be evocative (2-5 words, capitalize sparingly). Hooks should be ad-ready lines you'd actually use — not category clichés.`,
-      cache_control: { type: "ephemeral" as const },
-    },
-    brandSystemBlock(input.brand, input.language),
-  ];
+  const system = agentSystem(
+    `You are a brand strategist working in an editorial register. You write fewer, stronger ideas, never marketing puffery. Each idea must name a single insight, a specific audience, a promise (what the work will do for the audience), an angle, and a visual direction.\n\nReturn ideas via the emit_ideas tool. Each idea's "theme" should be evocative (2-5 words, capitalize sparingly). Hooks should be ad-ready lines you'd actually use — not category clichés.`,
+    input.brand,
+    input.language,
+  );
   const userText = [
     `Quarter: ${input.quarter || "this period"}${input.year ? " " + input.year : ""}`,
     `Objective: ${input.brief.objective}`,
