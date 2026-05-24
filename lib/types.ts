@@ -19,6 +19,25 @@ export const BrandLanguage = z.object({
     ctaMaxChars: z.number().int().min(4).max(40).default(24),
     eyebrowMaxChars: z.number().int().min(2).max(40).default(18),
   }).default({ headlineMaxChars: 48, subheadMaxChars: 120, ctaMaxChars: 24, eyebrowMaxChars: 18 }),
+  // Durable brand mechanics — the conventions copywriters keep consistent.
+  mechanics: z.object({
+    headlineCase: z.enum(["sentence", "title", "lower"]).default("sentence"),
+    exclamations: z.enum(["never", "sparing", "ok"]).default("sparing"),
+    emoji: z.enum(["never", "sparing", "ok"]).default("never"),
+    oxfordComma: z.boolean().default(true),
+    numerals: z.enum(["numerals", "spell-small", "words"]).default("numerals"),
+    contractions: z.enum(["use", "avoid"]).default("use"),
+    notes: z.string().default(""),
+  }).default({ headlineCase: "sentence", exclamations: "sparing", emoji: "never", oxfordComma: true, numerals: "numerals", contractions: "use", notes: "" }),
+  // Directed rewrites: prefer `to` over `from`.
+  wordSwaps: z.array(z.object({ from: z.string(), to: z.string() })).default([]),
+  // Voice exemplars anchored per slot.
+  exemplars: z.object({
+    eyebrow: z.array(z.string()).default([]),
+    headline: z.array(z.string()).default([]),
+    subhead: z.array(z.string()).default([]),
+    cta: z.array(z.string()).default([]),
+  }).default({ eyebrow: [], headline: [], subhead: [], cta: [] }),
 });
 export type BrandLanguage = z.infer<typeof BrandLanguage>;
 

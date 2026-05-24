@@ -16,6 +16,10 @@ import { rateLimit } from "@/lib/ratelimit";
 export async function saveLanguage(brandId: string, language: BrandLanguage) {
   await requireBrandAccess(brandId);
   const parsed = BrandLanguage.parse(language);
+  // Mirror per-slot exemplars into the legacy flat list so the cached brand
+  // prompt, the live preview, and older readers stay populated.
+  const flat = [...parsed.exemplars.headline, ...parsed.exemplars.subhead, ...parsed.exemplars.eyebrow, ...parsed.exemplars.cta];
+  if (flat.length) parsed.sampleSentences = flat;
   updateBrandLanguage(brandId, parsed);
   revalidatePath("/brands/[slug]/language", "page");
   revalidatePath("/brands/[slug]", "page");

@@ -125,6 +125,19 @@ export function brandSystemBlock(brand: Brand, language: BrandLanguage): Anthrop
   const anchors = listAnchorCopy(brand.id, 10);
   const anchorBlock = anchors.length ? formatAnchors(anchors) : "";
 
+  // Copywriter mechanics, directed swaps, and per-slot exemplars (guarded — older records may lack them).
+  const sw = language.wordSwaps || [];
+  const m: any = language.mechanics;
+  const ex: any = language.exemplars;
+  const exemplarBlock = ex && (ex.eyebrow?.length || ex.headline?.length || ex.subhead?.length || ex.cta?.length)
+    ? "Voice exemplars by slot:\n" + [
+        ex.headline?.length ? `Headlines: ${ex.headline.join(" / ")}` : "",
+        ex.subhead?.length ? `Subheads: ${ex.subhead.join(" / ")}` : "",
+        ex.eyebrow?.length ? `Eyebrows: ${ex.eyebrow.join(" / ")}` : "",
+        ex.cta?.length ? `CTAs: ${ex.cta.join(" / ")}` : "",
+      ].filter(Boolean).join("\n")
+    : (language.sampleSentences.length ? `Voice-correct sample sentences:\n${language.sampleSentences.map((s) => `- ${s}`).join("\n")}` : "");
+
   const text = [
     `# Brand: ${brand.name}`,
     `Industry: ${brand.industry || "unspecified"}`,
@@ -136,9 +149,11 @@ export function brandSystemBlock(brand: Brand, language: BrandLanguage): Anthrop
     `Tone profile: ${tonePhrase}`,
     language.preferredWords.length ? `Preferred words: ${language.preferredWords.join(", ")}` : "",
     language.bannedWords.length ? `Banned words (MUST avoid): ${language.bannedWords.join(", ")}` : "",
+    sw.length ? `Word swaps (always prefer the second, never the first): ${sw.map((w: any) => `${w.from} → ${w.to}`).join("; ")}` : "",
+    m ? `Style mechanics: headlines in ${m.headlineCase} case; exclamations ${m.exclamations}; emoji ${m.emoji}; ${m.oxfordComma ? "use the" : "no"} Oxford comma; numbers as ${m.numerals}; ${m.contractions === "avoid" ? "avoid" : "use"} contractions.${m.notes ? " " + m.notes : ""}` : "",
     language.doRules.length ? `Do: ${language.doRules.map((r) => `\n- ${r}`).join("")}` : "",
     language.doNotRules.length ? `Do not: ${language.doNotRules.map((r) => `\n- ${r}`).join("")}` : "",
-    language.sampleSentences.length ? `Voice-correct sample sentences:\n${language.sampleSentences.map((s) => `- ${s}`).join("\n")}` : "",
+    exemplarBlock,
     anchorBlock,
     "",
     `# Imagery`,
