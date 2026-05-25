@@ -259,6 +259,20 @@ function migrate(d: Database.Database) {
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_score REAL").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_notes TEXT").run(); } catch {}
 
+  // Device-authorization codes for the Figma plugin "Connect account" flow:
+  // the plugin starts a pending code, the user approves it in an authenticated
+  // browser session, and the plugin polls until it receives a token.
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS device_codes (
+    code TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'pending',
+    user_id TEXT,
+    token TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  `);
+
   // Personal access tokens for programmatic / MCP access. Only the sha256 hash
   // is stored; the plaintext is shown to the user once at creation.
   d.exec(`

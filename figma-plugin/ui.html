@@ -9,11 +9,11 @@
   h1 { font-size: 13px; margin: 0 0 2px; }
   p.sub { color: #9a9aa2; margin: 0 0 12px; }
   label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #8a8a92; margin: 8px 0 3px; }
-  input { width: 100%; box-sizing: border-box; background: #1a1a1f; border: 1px solid #2a2a32; color: #e8e8ea; border-radius: 7px; padding: 7px 9px; font-size: 12px; }
-  button { background: #4f46e5; color: #fff; border: 0; border-radius: 7px; padding: 8px 12px; font-size: 12px; cursor: pointer; }
+  input, select { width: 100%; box-sizing: border-box; background: #1a1a1f; border: 1px solid #2a2a32; color: #e8e8ea; border-radius: 7px; padding: 7px 9px; font-size: 12px; }
+  button { background: #4f46e5; color: #fff; border: 0; border-radius: 7px; padding: 9px 12px; font-size: 12px; cursor: pointer; }
   button.ghost { background: #1a1a1f; border: 1px solid #2a2a32; color: #d0d0d6; }
   button:disabled { opacity: .5; cursor: default; }
-  .row { display: flex; gap: 8px; align-items: center; }
+  button.block { width: 100%; }
   .bar { display: flex; gap: 8px; margin: 12px 0; }
   .bar button { flex: 1; }
   .item { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid #1e1e24; align-items: center; }
@@ -24,91 +24,142 @@
   .status { margin-top: 10px; font-size: 11px; min-height: 16px; }
   .status.err { color: #fb7185; }
   .status.ok { color: #34d399; }
-  .muted { color: #8a8a92; font-size: 10px; margin-top: 10px; }
-  hr { border: 0; border-top: 1px solid #1e1e24; margin: 12px 0; }
-  .hint { color: #6a6a72; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .status a { color: #c7d2fe; }
+  .muted { color: #8a8a92; font-size: 10px; margin-top: 12px; }
   code { background: #1a1a1f; border-radius: 4px; padding: 1px 4px; font-size: 11px; color: #c7d2fe; }
-  details.help { background: #14141a; border: 1px solid #2a2a32; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
-  details.help summary { cursor: pointer; font-size: 11px; color: #c7d2fe; }
-  details.help ol { margin: 8px 0 2px; padding-left: 18px; color: #b0b0b8; }
-  details.help li { margin: 4px 0; font-size: 11px; }
+  .connected { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: #9a9aa2; margin-bottom: 6px; }
+  .connected b { color: #34d399; }
+  details.adv { margin-top: 12px; }
+  details.adv summary { cursor: pointer; font-size: 10px; color: #6a6a72; text-transform: uppercase; letter-spacing: .04em; }
+  .link-btn { background: none; border: 0; color: #c7d2fe; text-decoration: underline; cursor: pointer; padding: 0; font-size: 11px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Augen ↔ Figma</h1>
-  <p class="sub">Pull an Augen creative onto the canvas, edit its copy & layout, push it back.</p>
+  <p class="sub">Pull an Augen creative onto the canvas, edit copy & layout, push it back.</p>
 
-  <details id="setup" class="help">
-    <summary>First time? Setup (3 steps)</summary>
-    <ol>
-      <li>In Augen, open <b>Settings → MCP &amp; API</b> and click <b>Generate token</b>. Copy it.</li>
-      <li>Paste your Augen URL + that token below, and the <b>brand slug</b> (the part after <code>/brands/</code> in the URL).</li>
-      <li><b>Load creatives</b> → <b>Import</b> one → edit the <code>augen:*</code> text layers → select the frame → <b>Send selection → Augen</b>.</li>
-    </ol>
-  </details>
+  <!-- Not connected -->
+  <div id="signedout">
+    <button id="connect" class="block">Connect Augen account</button>
+    <div class="muted">Opens Augen in your browser to approve — you stay signed in with your email there. No keys to copy.</div>
+  </div>
 
-  <label>Augen URL</label>
-  <input id="base" value="https://web-production-9666a.up.railway.app" placeholder="https://your-augen-url" />
-  <label>Access token <span class="hint">— Augen → Settings → MCP &amp; API</span></label>
-  <input id="token" type="password" placeholder="augen_…" />
-  <label>Brand slug <span class="hint">— e.g. tanda (from /brands/tanda)</span></label>
-  <input id="slug" placeholder="tanda" />
-
-  <div class="bar">
-    <button id="load">Load creatives</button>
-    <button id="send" class="ghost">Send selection → Augen</button>
+  <!-- Connected -->
+  <div id="signedin" style="display:none">
+    <div class="connected"><span><b>Connected</b> · <span id="who">your account</span></span><button class="link-btn" id="disconnect">disconnect</button></div>
+    <label>Brand</label>
+    <select id="brand"></select>
+    <div class="bar">
+      <button id="load">Load creatives</button>
+      <button id="send" class="ghost">Send selection → Augen</button>
+    </div>
+    <div id="list"></div>
   </div>
 
   <div id="status" class="status"></div>
-  <div id="list"></div>
-  <div class="muted"><b>Edit:</b> change the <code>augen:*</code> text layers (and move the headline / CTA) on an imported frame, select it, then <b>Send selection → Augen</b>. The render image is a locked backdrop — copy + layout sync back; re-render in Augen to see it.</div>
+
+  <details class="adv">
+    <summary>Advanced</summary>
+    <label>Augen URL</label>
+    <input id="base" placeholder="https://web-production-9666a.up.railway.app" />
+  </details>
+
+  <div class="muted"><b>Edit:</b> change the <code>augen:*</code> text layers (and move the headline / CTA) on an imported frame, select it, then <b>Send selection → Augen</b>. The render image is a locked backdrop; copy + layout sync back — re-render in Augen to see it.</div>
 </div>
 
 <script>
+  const BASE_DEFAULT = "https://web-production-9666a.up.railway.app";
   const $ = (id) => document.getElementById(id);
   const statusEl = $("status");
-  function setStatus(msg, kind) { statusEl.textContent = msg || ""; statusEl.className = "status" + (kind ? " " + kind : ""); }
+  function setStatus(msg, kind) { statusEl.innerHTML = msg || ""; statusEl.className = "status" + (kind ? " " + kind : ""); }
+  const ls = { get: (k) => localStorage.getItem("augen_" + k) || "", set: (k, v) => localStorage.setItem("augen_" + k, v || ""), del: (k) => localStorage.removeItem("augen_" + k) };
+  const base = () => (ls.get("base") || BASE_DEFAULT).replace(/\/$/, "");
+  const token = () => ls.get("token");
+  const authHeaders = () => ({ "x-augen-token": token() });
 
-  // Persist config locally in the plugin UI.
-  for (const k of ["base", "token", "slug"]) {
-    const v = localStorage.getItem("augen_" + k);
-    if (v) $(k).value = v;
-    $(k).addEventListener("change", () => localStorage.setItem("augen_" + k, $(k).value.trim()));
-  }
-  const cfg = () => ({ base: $("base").value.trim().replace(/\/$/, ""), token: $("token").value.trim(), slug: $("slug").value.trim() });
+  // restore advanced URL override
+  if (ls.get("base")) $("base").value = ls.get("base");
+  $("base").addEventListener("change", () => ls.set("base", $("base").value.trim()));
 
   let creatives = [];
 
-  $("load").onclick = async () => {
-    const { base, token, slug } = cfg();
-    if (!base || !token || !slug) { setStatus("Fill in URL, token, and brand slug.", "err"); return; }
-    setStatus("Loading…");
+  function render() {
+    if (token()) { $("signedout").style.display = "none"; $("signedin").style.display = "block"; }
+    else { $("signedout").style.display = "block"; $("signedin").style.display = "none"; }
+  }
+
+  // ---- Connect (device authorization) ----
+  $("connect").onclick = async () => {
+    setStatus("Starting…");
     try {
-      const res = await fetch(base + "/api/plugin/creatives?brand=" + encodeURIComponent(slug), { headers: { "x-augen-token": token } });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      const r = await fetch(base() + "/api/plugin/connect/start", { method: "POST" });
+      const data = await r.json();
+      if (!r.ok || !data.code) throw new Error(data.error || "Could not start");
+      try { window.open(data.verifyUrl, "_blank"); } catch (e) {}
+      setStatus('Approve in your browser, then come back. <a href="' + data.verifyUrl + '" target="_blank">Open the approval page</a>', "");
+      pollConnect(data.code, 0);
+    } catch (e) { setStatus("Connect failed: " + (e.message || ""), "err"); }
+  };
+
+  function pollConnect(code, tries) {
+    if (tries > 150) { setStatus("Connection timed out — click Connect to try again.", "err"); return; } // ~5 min
+    setTimeout(async () => {
+      try {
+        const r = await fetch(base() + "/api/plugin/connect/poll", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+        const data = await r.json();
+        if (data.status === "approved" && data.token) { ls.set("token", data.token); render(); setStatus("Connected ✓", "ok"); loadBrands(); return; }
+        if (data.status === "expired") { setStatus("That link expired — click Connect to try again.", "err"); return; }
+        setStatus("Waiting for approval in your browser…");
+        pollConnect(code, tries + 1);
+      } catch (e) { pollConnect(code, tries + 1); }
+    }, 2000);
+  }
+
+  $("disconnect").onclick = () => { ls.del("token"); ls.del("brand"); creatives = []; $("list").innerHTML = ""; render(); setStatus(""); };
+
+  // ---- Brands ----
+  async function loadBrands() {
+    setStatus("Loading brands…");
+    try {
+      const r = await fetch(base() + "/api/plugin/brands", { headers: authHeaders() });
+      const data = await r.json();
+      if (r.status === 401) { ls.del("token"); render(); setStatus("Session expired — connect again.", "err"); return; }
+      if (!r.ok) throw new Error(data.error || "Failed");
+      const sel = $("brand"); sel.innerHTML = "";
+      if (!data.brands.length) { sel.innerHTML = '<option value="">No brands on this account</option>'; setStatus("No brands found.", ""); return; }
+      data.brands.forEach((b) => { const o = document.createElement("option"); o.value = b.slug; o.textContent = b.name + (b.industry ? " · " + b.industry : ""); sel.appendChild(o); });
+      const saved = ls.get("brand");
+      if (saved && data.brands.some((b) => b.slug === saved)) sel.value = saved;
+      setStatus("Pick a brand and Load creatives.", "ok");
+    } catch (e) { setStatus("Brands failed: " + (e.message || ""), "err"); }
+  }
+  $("brand").addEventListener("change", () => ls.set("brand", $("brand").value));
+
+  // ---- Creatives ----
+  $("load").onclick = async () => {
+    const slug = $("brand").value;
+    if (!slug) { setStatus("Pick a brand first.", "err"); return; }
+    setStatus("Loading creatives…");
+    try {
+      const r = await fetch(base() + "/api/plugin/creatives?brand=" + encodeURIComponent(slug), { headers: authHeaders() });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
       creatives = data.creatives || [];
       renderList();
-      setStatus(creatives.length + " creative(s) for " + (data.brand ? data.brand.name : slug), "ok");
+      setStatus(creatives.length + " creative(s) in " + (data.brand ? data.brand.name : slug), "ok");
     } catch (e) { setStatus(e.message || "Load failed", "err"); }
   };
 
   function renderList() {
-    const list = $("list");
-    list.innerHTML = "";
+    const list = $("list"); list.innerHTML = "";
     creatives.forEach((c) => {
       const row = document.createElement("div");
       row.className = "item";
-      row.innerHTML =
-        '<img src="' + c.pngUrl + '" alt="" />' +
-        '<div class="meta"><div class="hl">' + (c.headline || "(no headline)") + '</div>' +
-        '<div class="fmt">' + c.format + " · " + c.width + "×" + c.height + " · " + c.status + "</div></div>";
-      const btn = document.createElement("button");
-      btn.textContent = "Import";
+      row.innerHTML = '<img src="' + c.pngUrl + '" alt="" /><div class="meta"><div class="hl">' + (c.headline || "(no headline)") + '</div><div class="fmt">' + c.format + " · " + c.width + "×" + c.height + " · " + c.status + "</div></div>";
+      const btn = document.createElement("button"); btn.textContent = "Import";
       btn.onclick = () => importCreative(c);
-      row.appendChild(btn);
-      list.appendChild(row);
+      row.appendChild(btn); list.appendChild(row);
     });
   }
 
@@ -123,19 +174,18 @@
 
   $("send").onclick = () => { setStatus("Reading selection…"); parent.postMessage({ pluginMessage: { type: "read-selection" } }, "*"); };
 
-  // Messages back from the plugin sandbox (code.js).
+  // ---- Messages from the sandbox (code.js) ----
   window.onmessage = async (event) => {
     const msg = event.data.pluginMessage;
     if (!msg) return;
     if (msg.type === "imported") setStatus("Imported to canvas ✓", "ok");
     else if (msg.type === "error") setStatus(msg.message, "err");
     else if (msg.type === "selection-copy") {
-      const { base, token } = cfg();
       setStatus("Sending to Augen…");
       try {
-        const res = await fetch(base + "/api/plugin/creatives/" + msg.id, {
+        const res = await fetch(base() + "/api/plugin/creatives/" + msg.id, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "x-augen-token": token },
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
           body: JSON.stringify(Object.assign({}, msg.copy, { layout: msg.layout })),
         });
         const data = await res.json();
@@ -144,6 +194,10 @@
       } catch (e) { setStatus("Save failed: " + (e.message || ""), "err"); }
     }
   };
+
+  // boot
+  render();
+  if (token()) loadBrands();
 </script>
 </body>
 </html>

@@ -4,8 +4,9 @@ import { signInAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export default function SignIn({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
+export default async function SignIn({ searchParams }: { searchParams?: Promise<Record<string, string>> }) {
   const users = listUsers();
+  const next = (await searchParams)?.next || "";
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <Card className="w-full max-w-md p-8 space-y-6">
@@ -18,6 +19,7 @@ export default function SignIn({ searchParams }: { searchParams?: Promise<Record
         </div>
 
         <form action={signInAction} className="space-y-3">
+          {next && <input type="hidden" name="next" value={next} />}
           <div className="space-y-1.5">
             <Label>Email</Label>
             <Input type="email" name="email" placeholder="you@studio.com" required />
@@ -37,6 +39,7 @@ export default function SignIn({ searchParams }: { searchParams?: Promise<Record
                 <form key={u.id} action={signInAction}>
                   <input type="hidden" name="email" value={u.email} />
                   <input type="hidden" name="name" value={u.name} />
+                  {next && <input type="hidden" name="next" value={next} />}
                   <button className="flex items-center gap-2 rounded-full px-3 py-1.5 ring-1 ring-white/10 text-xs text-ink-200 hover:bg-white/5">
                     <span className="w-4 h-4 rounded-full" style={{ background: u.avatar_color }} />
                     {u.name}

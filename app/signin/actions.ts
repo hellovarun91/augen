@@ -16,7 +16,9 @@ export async function signInAction(fd: FormData) {
     throw new Error("This account is disabled. Contact your studio admin.");
   }
   await setCurrentUser(user.id);
-  redirect("/");
+  const next = String(fd.get("next") || "");
+  // Only honor safe, in-app relative paths.
+  redirect(/^\/(?!\/)/.test(next) ? next : "/");
 }
 
 export async function signOutAction() {

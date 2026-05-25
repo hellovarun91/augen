@@ -336,6 +336,43 @@ export function resolveApiToken(plaintext: string): string | null {
   return row.user_id;
 }
 
+// ---------- Device-authorization codes (Figma "Connect account") ----------
+const DEVICE_CODE_TTL_MS = 10 * 60 * 1000;
+
+export function createDeviceCode(): { code: string } {
+  const code = randomBytes(18).toString("hex");
+  const now = nowMs();
+  db().prepare("INSERT INTO device_codes (code, status, created_at, expires_at) VALUES (?, 'pending', ?, ?)")
+    .run(code, now, now + DEVICE_CODE_TTL_MS);
+  return { code };
+}
+
+export function getDeviceCode(code: string): { code: string; status: string; user_id: string | null; expires_at: number } | null {
+  return (db().prepare("SELECT code, status, user_id, expires_at FROM device_codes WHERE code = ?").get(code) as any) || null;
+}
+
+// Called from the authenticated /connect approval — binds a freshly minted token.
+export function approveDeviceCode(code: string, userId: string, token: string): boolean {
+  const row = getDeviceCode(code);
+  if (!row || row.status !== "pending" || row.expires_at < nowMs()) return false;
+  db().prepare("UPDATE device_codes SET status = 'approved', user_id = ?, token = ? WHERE code = ?").run(userId, token, code);
+  return true;
+}
+
+// Plugin polls this. Returns the token exactly once, then deletes the row.
+export function pollDeviceCode(code: string): { status: "pending" | "approved" | "expired"; token?: string } {
+  const row = db().prepare("SELECT * FROM device_codes WHERE code = ?").get(code) as any;
+  if (!row || row.expires_at < nowMs()) {
+    if (row) db().prepare("DELETE FROM device_codes WHERE code = ?").run(code);
+    return { status: "expired" };
+  }
+  if (row.status === "approved" && row.token) {
+    db().prepare("DELETE FROM device_codes WHERE code = ?").run(code);
+    return { status: "approved", token: row.token };
+  }
+  return { status: "pending" };
+}
+
 // Membership-based access check (token-scoped, no session).
 export function hasBrandAccess(userId: string, brandId: string): boolean {
   const m = db().prepare("SELECT 1 FROM memberships WHERE user_id = ? AND brand_id = ? LIMIT 1").get(userId, brandId);

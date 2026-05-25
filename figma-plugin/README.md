@@ -18,30 +18,33 @@ token sync, lives in the app under **Manage Brand → Design tokens → Figma**)
 > and the CTA's position maps to the nearest CTA placement preset. Finer layout
 > (per-element free positioning) still lives in Figma.
 
-## One-time setup
+## Setup — just connect your account
 
-1. **Generate a token in Augen.** Open **Settings → MCP & API** and click
-   **Generate token** (the same personal tokens MCP uses). Copy it.
-
-2. **Load the plugin in Figma** (desktop app):
+1. **Load the plugin in Figma** (desktop app):
    - Menu → **Plugins → Development → Import plugin from manifest…**
    - Pick `figma-plugin/manifest.json` from this repo.
 
-3. **Open the plugin** and fill in:
-   - **Augen URL** — e.g. `https://web-production-9666a.up.railway.app` (pre-filled)
-   - **Access token** — the token you generated in step 1 (`augen_…`)
-   - **Brand slug** — the part after `/brands/` in the brand's URL, e.g. `tanda`
+2. **Click "Connect Augen account."** A browser tab opens Augen — you're already
+   signed in with your email (or sign in if not) — and you click **Approve**. The
+   plugin connects automatically. No URL, token, or brand slug to type.
 
-No server env var needed — it works against any Augen deploy as soon as you have a token.
+3. Pick a **brand** from the dropdown → **Load creatives** → **Import** one →
+   edit the `augen:*` text layers (and move the headline / CTA) → select the
+   frame → **Send selection → Augen**.
 
-## Security notes
+The Augen URL is baked in (override it under **Advanced** for a different deploy).
 
-- The plugin API (`/api/plugin/*`) authenticates with a **personal token** (the same
-  tokens as MCP, sent as `x-augen-token`), resolves it to your user, and scopes every
-  request to brands you're a member of — so it works from Figma's sandbox and can't
-  touch other people's brands.
-- Before sharing the plugin, narrow `networkAccess.allowedDomains` in `manifest.json`
-  from `["*"]` to just your Augen domain.
+## How it works / security
+
+- "Connect" runs a **device-authorization** flow: the plugin opens `/connect?code=…`,
+  you **approve inside your authenticated Augen session**, and Augen mints a personal
+  token (named "Figma plugin") that the plugin receives by polling. Your email is never
+  the credential — approval happens in your logged-in session.
+- The plugin API (`/api/plugin/*`) resolves that token to your user and scopes every
+  request to brands you're a member of — it can't touch anyone else's brands.
+- Revoke access anytime in Augen → **Settings → MCP & API** (the "Figma plugin" token).
+- Before sharing the plugin publicly, narrow `networkAccess.allowedDomains` in
+  `manifest.json` from `["*"]` to just your Augen domain.
 
 ## Files
 
