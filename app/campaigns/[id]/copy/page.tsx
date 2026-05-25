@@ -1,5 +1,5 @@
 import { Eyebrow } from "@/components/ui/primitives";
-import { getCampaign, getBrand, getProjectCopySchema, listCopyRows, listGenerationsByCampaign } from "@/lib/repo";
+import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign, listGenerationsByCampaign } from "@/lib/repo";
 import { formatBySlug } from "@/lib/formats";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -15,7 +15,7 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
   const brand = getBrand(campaign.brand_id);
   if (!brand) notFound();
   const schema = getProjectCopySchema(campaign.id);
-  const rows = listCopyRows(campaign.id);
+  const rows = syncCopyRowsForCampaign(campaign.id);
   const generations = listGenerationsByCampaign(campaign.id).map((g) => {
     const f = formatBySlug(g.format_slug);
     const hl = (g.headline || "").replace(/\s+/g, " ").trim().slice(0, 28);

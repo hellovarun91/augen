@@ -2,7 +2,7 @@ import { db, nowMs } from "./db";
 import { nanoid } from "nanoid";
 import { createHash, randomBytes } from "crypto";
 import { BrandLanguage, BrandTokens, type Brand, type BrandRow, type Campaign, type CampaignRow, type CampaignBrief, type Generation, type GenerationRow, type Idea, type IdeaRow } from "./types";
-import { parseCopySchema, defaultCopySchema, type CopySchema } from "./copy-schema";
+import { parseCopySchema, defaultCopySchema, layerCopyToRowValues, type CopySchema } from "./copy-schema";
 
 export function listBrands(): Brand[] {
   const rows = db().prepare("SELECT * FROM brands ORDER BY created_at DESC").all() as BrandRow[];
@@ -672,6 +672,27 @@ export function updateCopyRow(id: string, patch: { values?: Record<string, strin
 
 export function deleteCopyRow(id: string) {
   db().prepare("DELETE FROM copy_rows WHERE id = ?").run(id);
+}
+
+// Ensures the Copy Sheet mirrors the project: every creative without a row gets
+// one, auto-linked + pre-filled with its current copy. Idempotent — only fills
+// gaps, never duplicates or touches existing rows. Returns the full row list.
+export function syncCopyRowsForCampaign(campaignId: string): CopyRow[] {
+  const camp = getCampaign(campaignId);
+  if (!camp) return [];
+  const schema = getProjectCopySchema(campaignId);
+  const rows = listCopyRows(campaignId);
+  const linked = new Set(rows.map((r) => r.generation_id).filter(Boolean) as string[]);
+  const gens = listGenerationsByCampaign(campaignId);
+  let created = false;
+  for (const g of gens) {
+    if (linked.has(g.id)) continue;
+    const values = layerCopyToRowValues(schema, {}, { headline: g.headline || "", subhead: g.subhead || "", cta: g.cta || "", eyebrow: g.eyebrow || "" });
+    const row = createCopyRow(campaignId, camp.brand_id, values);
+    linkCopyRow(row.id, g.id);
+    created = true;
+  }
+  return created ? listCopyRows(campaignId) : rows;
 }
 
 export function getCopyRow(id: string): CopyRow | null {
