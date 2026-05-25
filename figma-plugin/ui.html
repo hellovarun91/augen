@@ -37,7 +37,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Augen ↔ Figma <span style="color:#6a6a72;font-weight:400;font-size:10px">· v5</span></h1>
+  <h1>Augen ↔ Figma <span style="color:#6a6a72;font-weight:400;font-size:10px">· v6</span></h1>
   <p class="sub">Pull an Augen creative onto the canvas, edit copy & layout, push it back.</p>
 
   <!-- Not connected -->
@@ -213,16 +213,22 @@
     else if (msg.type === "tokens") {
       const slug = $("brand").value;
       if (!slug) { setStatus("Pick a brand first.", "err"); return; }
-      setStatus("Sending " + Object.keys(msg.flat || {}).length + " variable(s) to Augen…");
+      const vars = msg.vars || [];
+      if (!vars.length) { setStatus("No Variables found in this file (define some color/* and font/* Variables in Figma).", "err"); return; }
+      setStatus("Reading " + vars.length + " variables → Augen…");
       try {
         const res = await fetch(base() + "/api/plugin/tokens", {
           method: "POST",
           headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-          body: JSON.stringify({ brand: slug, vars: msg.flat || {} }),
+          body: JSON.stringify({ brand: slug, vars: vars }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
-        setStatus(data.changed ? ("Updated design tokens ✓ — " + data.groups.join(", ")) : (data.message || "No mappable variables found."), data.changed ? "ok" : "err");
+        if (!res.ok || data.error) throw new Error(data.error || ("HTTP " + res.status));
+        if (data.staged) {
+          setStatus((data.message || "Review the mapping in Augen.") + ' <a href="' + data.reviewUrl + '" target="_blank" style="display:inline-block;margin-top:6px;background:#4f46e5;color:#fff;padding:6px 10px;border-radius:6px;text-decoration:none">Review in Augen →</a>', "ok");
+        } else {
+          setStatus(data.message || "Design tokens updated ✓", "ok");
+        }
       } catch (e) { setStatus("Token sync failed: " + (e.message || ""), "err"); }
     }
     else if (msg.type === "selection-copy") {

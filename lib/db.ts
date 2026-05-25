@@ -287,6 +287,17 @@ function migrate(d: Database.Database) {
   CREATE INDEX IF NOT EXISTS api_tokens_user_idx ON api_tokens(user_id);
   `);
 
+  // Figma design-token mapping per brand: the saved slot->variable mapping, plus
+  // a transient staged proposal awaiting the designer's review.
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS figma_token_maps (
+    brand_id TEXT PRIMARY KEY REFERENCES brands(id) ON DELETE CASCADE,
+    mapping_json TEXT,
+    staged_json TEXT,
+    updated_at INTEGER NOT NULL
+  );
+  `);
+
   // Figma live-sync webhooks: one per brand, keyed to a team + file. Figma POSTs
   // our endpoint on FILE_UPDATE and we auto-pull Variables into the brand tokens.
   d.exec(`

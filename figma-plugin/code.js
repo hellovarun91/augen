@@ -129,7 +129,7 @@ async function readTokens() {
   const colById = {};
   collections.forEach((c) => { colById[c.id] = c; });
   const vars = await figma.variables.getLocalVariablesAsync();
-  const flat = {};
+  const out = [];
   for (const v of vars) {
     const col = colById[v.variableCollectionId];
     let modeId = (col && col.defaultModeId) || Object.keys(v.valuesByMode)[0];
@@ -142,10 +142,11 @@ async function readTokens() {
       const tmode = (tcol && tcol.defaultModeId) || Object.keys(t.valuesByMode)[0];
       val = t.valuesByMode[tmode];
     }
-    if (val && typeof val === "object" && typeof val.r === "number") flat[v.name] = rgbaToHex(val);
-    else if (typeof val === "number" || typeof val === "string") flat[v.name] = val;
+    if (val && typeof val === "object" && typeof val.r === "number") out.push({ name: v.name, value: rgbaToHex(val), type: "COLOR" });
+    else if (typeof val === "number") out.push({ name: v.name, value: val, type: "FLOAT" });
+    else if (typeof val === "string") out.push({ name: v.name, value: val, type: "STRING" });
   }
-  figma.ui.postMessage({ type: "tokens", flat: flat, count: vars.length });
+  figma.ui.postMessage({ type: "tokens", vars: out });
 }
 
 figma.ui.onmessage = async (msg) => {

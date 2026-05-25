@@ -396,6 +396,30 @@ export function deleteBrand(id: string) {
   d.prepare("DELETE FROM brands WHERE id = ?").run(id);
 }
 
+// ---------- Figma design-token mapping (per brand) ----------
+export interface TokenMapStage { vars: Array<{ name: string; value: string | number; type?: string }>; mapping: Record<string, string>; viaAI: boolean }
+
+export function getSavedTokenMapping(brandId: string): Record<string, string> | null {
+  const r = db().prepare("SELECT mapping_json FROM figma_token_maps WHERE brand_id = ?").get(brandId) as { mapping_json: string | null } | undefined;
+  return r?.mapping_json ? JSON.parse(r.mapping_json) : null;
+}
+export function getTokenStage(brandId: string): TokenMapStage | null {
+  const r = db().prepare("SELECT staged_json FROM figma_token_maps WHERE brand_id = ?").get(brandId) as { staged_json: string | null } | undefined;
+  return r?.staged_json ? JSON.parse(r.staged_json) : null;
+}
+function upsertTokenMapRow(brandId: string, patch: { mapping?: string | null; staged?: string | null }) {
+  const existing = db().prepare("SELECT brand_id FROM figma_token_maps WHERE brand_id = ?").get(brandId);
+  if (existing) {
+    if (patch.mapping !== undefined) db().prepare("UPDATE figma_token_maps SET mapping_json = ?, updated_at = ? WHERE brand_id = ?").run(patch.mapping, nowMs(), brandId);
+    if (patch.staged !== undefined) db().prepare("UPDATE figma_token_maps SET staged_json = ?, updated_at = ? WHERE brand_id = ?").run(patch.staged, nowMs(), brandId);
+  } else {
+    db().prepare("INSERT INTO figma_token_maps (brand_id, mapping_json, staged_json, updated_at) VALUES (?, ?, ?, ?)").run(brandId, patch.mapping ?? null, patch.staged ?? null, nowMs());
+  }
+}
+export function stageTokenMapping(brandId: string, stage: TokenMapStage) { upsertTokenMapRow(brandId, { staged: JSON.stringify(stage) }); }
+export function saveTokenMapping(brandId: string, mapping: Record<string, string>) { upsertTokenMapRow(brandId, { mapping: JSON.stringify(mapping), staged: null }); }
+export function clearTokenStage(brandId: string) { upsertTokenMapRow(brandId, { staged: null }); }
+
 // ---------- Figma live-sync webhooks ----------
 export interface FigmaWebhookRow {
   brand_id: string; team_id: string; file_key: string; webhook_id: string;

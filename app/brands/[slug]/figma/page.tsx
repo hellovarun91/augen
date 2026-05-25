@@ -1,8 +1,10 @@
 import { Badge, Card, Eyebrow, Section } from "@/components/ui/primitives";
-import { getBrandBySlug, getBrandFigmaUrl, getFigmaWebhookByBrand } from "@/lib/repo";
+import { getBrandBySlug, getBrandFigmaUrl, getFigmaWebhookByBrand, getTokenStage } from "@/lib/repo";
+import { TOKEN_SLOTS } from "@/lib/figma/token-map";
 import { notFound } from "next/navigation";
 import { FigmaSyncForm } from "./form";
 import { FigmaLiveSync } from "./live-sync";
+import { TokenReview } from "./token-review";
 import { figmaStatus } from "@/lib/images/providers";
 import { TokenSubNav } from "@/components/token-subnav";
 
@@ -15,6 +17,7 @@ export default async function FigmaPage({ params }: { params: Promise<{ slug: st
   const fileUrl = getBrandFigmaUrl(brand.id) || "";
   const status = figmaStatus();
   const hook = getFigmaWebhookByBrand(brand.id);
+  const stage = getTokenStage(brand.id);
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-5xl mx-auto space-y-10">
@@ -30,6 +33,10 @@ export default async function FigmaPage({ params }: { params: Promise<{ slug: st
         </div>
         <Badge tone={status.enabled ? "ok" : "warn"}>{status.enabled ? "FIGMA_PERSONAL_ACCESS_TOKEN ready" : "Set FIGMA_PERSONAL_ACCESS_TOKEN"}</Badge>
       </div>
+
+      {stage && (
+        <TokenReview brandId={brand.id} slug={brand.slug} slots={TOKEN_SLOTS} vars={stage.vars} proposal={stage.mapping} viaAI={stage.viaAI} />
+      )}
 
       <Card className="p-6">
         <FigmaSyncForm

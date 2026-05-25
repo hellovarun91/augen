@@ -1,7 +1,8 @@
 "use server";
 import { randomUUID } from "crypto";
 import { BrandTokens } from "@/lib/types";
-import { getBrand, getBrandFigmaUrl, updateBrandFigmaUrl, updateBrandTokens, getFigmaWebhookByBrand, upsertFigmaWebhook, deleteFigmaWebhook } from "@/lib/repo";
+import { getBrand, getBrandFigmaUrl, updateBrandFigmaUrl, updateBrandTokens, getFigmaWebhookByBrand, upsertFigmaWebhook, deleteFigmaWebhook, getTokenStage, saveTokenMapping, clearTokenStage } from "@/lib/repo";
+import { applyMapping } from "@/lib/figma/token-map";
 import { pullVariables, pushVariables, parseFileKey, registerWebhook, deleteWebhookRemote } from "@/lib/figma/sync";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -60,6 +61,27 @@ export async function enableLiveSyncAction(brandId: string, brandSlug: string, t
   const passcode = randomUUID().replace(/-/g, "");
   const wh = await registerWebhook(team, endpoint, passcode, `Augen · ${brand.name}`);
   upsertFigmaWebhook({ brand_id: brandId, team_id: team, file_key: fileKey, webhook_id: wh.id, passcode, endpoint, active: 1 });
+  revalidatePath(`/brands/${brandSlug}/figma`);
+}
+
+// Apply the reviewed Figma→Augen token mapping, and remember it for next time.
+export async function applyTokenMappingAction(brandId: string, brandSlug: string, mapping: Record<string, string>) {
+  await requireBrandAccess(brandId);
+  const brand = getBrand(brandId);
+  if (!brand) throw new Error("Brand missing");
+  const stage = getTokenStage(brandId);
+  if (!stage) throw new Error("Nothing to apply — pull tokens from the Figma plugin first.");
+  const merged = applyMapping(brand.tokens, mapping, stage.vars);
+  updateBrandTokens(brandId, merged);
+  saveTokenMapping(brandId, mapping); // also clears the staged proposal
+  revalidatePath(`/brands/${brandSlug}`);
+  revalidatePath(`/brands/${brandSlug}/tokens`);
+  revalidatePath(`/brands/${brandSlug}/figma`);
+}
+
+export async function discardTokenMappingAction(brandId: string, brandSlug: string) {
+  await requireBrandAccess(brandId);
+  clearTokenStage(brandId);
   revalidatePath(`/brands/${brandSlug}/figma`);
 }
 
