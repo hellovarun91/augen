@@ -16,6 +16,7 @@ export function SidebarNav({
 }) {
   const path = usePathname() || "/";
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
 
   // Resolve the brand the menu scopes to from the URL on the client, since the
   // server-rendered layout doesn't re-run on soft navigation. We remember the
@@ -94,14 +95,25 @@ export function SidebarNav({
       </div>
 
       {isAdmin && (
-        <Section label="Admin">
-          <NavItem href="/admin" label="Overview" active={path === "/admin"} />
-          <NavItem href="/admin/costs" label="Cost dashboard" active={path === "/admin/costs"} />
-          <NavItem href="/admin/testers" label="Testers" active={path === "/admin/testers"} />
-          <NavItem href="/admin/users" label="Users" active={path.startsWith("/admin/users")} />
-          <NavItem href="/admin/features" label="Feature flags" active={path === "/admin/features"} />
-          <NavItem href="/usage" label="Token detail" active={path === "/usage"} />
-        </Section>
+        <div className="px-3 py-2">
+          <button
+            onClick={() => setAdminOpen((v) => !v)}
+            className="w-full flex items-center justify-between px-3 text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-200 transition-colors"
+          >
+            <span>Admin</span>
+            <span className={cn("transition-transform", adminOpen && "rotate-90")}>›</span>
+          </button>
+          {adminOpen && (
+            <nav className="space-y-0.5 mt-1.5">
+              <NavItem href="/admin" label="Overview" active={path === "/admin"} />
+              <NavItem href="/admin/costs" label="Cost dashboard" active={path === "/admin/costs"} />
+              <NavItem href="/admin/testers" label="Testers" active={path === "/admin/testers"} />
+              <NavItem href="/admin/users" label="Users" active={path.startsWith("/admin/users")} />
+              <NavItem href="/admin/features" label="Feature flags" active={path === "/admin/features"} />
+              <NavItem href="/usage" label="Token detail" active={path === "/usage"} />
+            </nav>
+          )}
+        </div>
       )}
 
       <div className="mt-auto p-4 border-t border-white/5">
