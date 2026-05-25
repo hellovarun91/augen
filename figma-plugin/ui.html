@@ -32,17 +32,28 @@
   details.adv { margin-top: 12px; }
   details.adv summary { cursor: pointer; font-size: 10px; color: #6a6a72; text-transform: uppercase; letter-spacing: .04em; }
   .link-btn { background: none; border: 0; color: #c7d2fe; text-decoration: underline; cursor: pointer; padding: 0; font-size: 11px; }
+  .or { text-align: center; color: #6a6a72; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 6px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Augen ↔ Figma <span style="color:#6a6a72;font-weight:400;font-size:10px">· v3</span></h1>
+  <h1>Augen ↔ Figma <span style="color:#6a6a72;font-weight:400;font-size:10px">· v4</span></h1>
   <p class="sub">Pull an Augen creative onto the canvas, edit copy & layout, push it back.</p>
 
   <!-- Not connected -->
   <div id="signedout">
-    <button id="connect" class="block">Connect Augen account</button>
-    <div class="muted">Opens Augen in your browser to approve — you stay signed in with your email there. No keys to copy.</div>
+    <label>Augen URL</label>
+    <input id="base" placeholder="https://… or http://localhost:3000" />
+
+    <button id="connect" class="block" style="margin-top:12px">Connect Augen account</button>
+    <div class="muted">Opens Augen in your browser to approve. If you're on localhost and this does nothing, use a token below instead.</div>
+
+    <div class="or">or paste a token</div>
+    <div style="display:flex;gap:8px">
+      <input id="ptoken" type="password" placeholder="augen_…" style="flex:1" />
+      <button id="usetoken" class="ghost" style="flex:none">Use</button>
+    </div>
+    <div class="muted">Generate one at <span id="tokurl">your Augen</span> → Settings → MCP &amp; API.</div>
   </div>
 
   <!-- Connected -->
@@ -59,19 +70,7 @@
 
   <div id="status" class="status"></div>
 
-  <details class="adv">
-    <summary>Advanced</summary>
-    <label>Augen URL</label>
-    <input id="base" placeholder="https://web-production-9666a.up.railway.app" />
-    <label style="margin-top:8px">Paste a token (skips Connect — most reliable for localhost)</label>
-    <div style="display:flex;gap:8px">
-      <input id="ptoken" type="password" placeholder="augen_…" style="flex:1" />
-      <button id="usetoken" class="ghost" style="flex:none">Use token</button>
-    </div>
-    <div style="font-size:10px;color:#6a6a72;margin-top:4px">Generate one at <span id="tokurl">your Augen</span> → Settings → MCP &amp; API.</div>
-  </details>
-
-  <div class="muted"><b>Edit:</b> change the <code>augen:*</code> text layers (and move the headline / CTA) on an imported frame, select it, then <b>Send selection → Augen</b>. The render image is a locked backdrop; copy + layout sync back — re-render in Augen to see it.</div>
+  <div class="muted" style="margin-top:14px"><b>Then:</b> pick a brand → <b>Load creatives</b> → <b>Import</b> one → edit the <code>augen:*</code> text layers (and move the headline / CTA) → select the frame → <b>Send selection → Augen</b>. Copy + layout sync back; re-render in Augen to see it.</div>
 </div>
 
 <script>
@@ -79,7 +78,14 @@
   const $ = (id) => document.getElementById(id);
   const statusEl = $("status");
   function setStatus(msg, kind) { statusEl.innerHTML = msg || ""; statusEl.className = "status" + (kind ? " " + kind : ""); }
-  const ls = { get: (k) => localStorage.getItem("augen_" + k) || "", set: (k, v) => localStorage.setItem("augen_" + k, v || ""), del: (k) => localStorage.removeItem("augen_" + k) };
+  // Figma runs the UI from a data: URL where localStorage is DISABLED (it throws).
+  // Use an in-memory store, falling back to localStorage only if it happens to work.
+  const mem = {};
+  const ls = {
+    get: (k) => { try { return localStorage.getItem("augen_" + k) || mem[k] || ""; } catch { return mem[k] || ""; } },
+    set: (k, v) => { mem[k] = v || ""; try { localStorage.setItem("augen_" + k, v || ""); } catch {} },
+    del: (k) => { delete mem[k]; try { localStorage.removeItem("augen_" + k); } catch {} },
+  };
   const base = () => (ls.get("base") || BASE_DEFAULT).replace(/\/$/, "");
   const token = () => ls.get("token");
   const authHeaders = () => ({ "x-augen-token": token() });
