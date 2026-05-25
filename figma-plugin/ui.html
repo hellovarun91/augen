@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: dark; }
+  body { font: 12px/1.5 Inter, system-ui, sans-serif; margin: 0; background: #0f0f11; color: #e8e8ea; }
+  .wrap { padding: 14px; }
+  h1 { font-size: 13px; margin: 0 0 2px; }
+  p.sub { color: #9a9aa2; margin: 0 0 12px; }
+  label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #8a8a92; margin: 8px 0 3px; }
+  input { width: 100%; box-sizing: border-box; background: #1a1a1f; border: 1px solid #2a2a32; color: #e8e8ea; border-radius: 7px; padding: 7px 9px; font-size: 12px; }
+  button { background: #4f46e5; color: #fff; border: 0; border-radius: 7px; padding: 8px 12px; font-size: 12px; cursor: pointer; }
+  button.ghost { background: #1a1a1f; border: 1px solid #2a2a32; color: #d0d0d6; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .bar { display: flex; gap: 8px; margin: 12px 0; }
+  .bar button { flex: 1; }
+  .item { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid #1e1e24; align-items: center; }
+  .item img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; background: #1a1a1f; flex: none; }
+  .item .meta { flex: 1; min-width: 0; }
+  .item .meta .fmt { color: #9a9aa2; font-size: 10px; }
+  .item .meta .hl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { margin-top: 10px; font-size: 11px; min-height: 16px; }
+  .status.err { color: #fb7185; }
+  .status.ok { color: #34d399; }
+  .muted { color: #8a8a92; font-size: 10px; margin-top: 10px; }
+  hr { border: 0; border-top: 1px solid #1e1e24; margin: 12px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Augen ↔ Figma</h1>
+  <p class="sub">Import a creative, edit its copy here, send it back to Augen.</p>
+
+  <label>Augen URL</label>
+  <input id="base" placeholder="https://web-production-9666a.up.railway.app" />
+  <label>Plugin token</label>
+  <input id="token" type="password" placeholder="PLUGIN_API_TOKEN" />
+  <label>Brand slug</label>
+  <input id="slug" placeholder="tanda" />
+
+  <div class="bar">
+    <button id="load">Load creatives</button>
+    <button id="send" class="ghost">Send selection → Augen</button>
+  </div>
+
+  <div id="list"></div>
+  <div id="status" class="status"></div>
+  <div class="muted">Edit the <b>augen:*</b> text layers on an imported frame, select it, then “Send selection → Augen”. The render is a locked backdrop.</div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status");
+  function setStatus(msg, kind) { statusEl.textContent = msg || ""; statusEl.className = "status" + (kind ? " " + kind : ""); }
+
+  // Persist config locally in the plugin UI.
+  for (const k of ["base", "token", "slug"]) {
+    const v = localStorage.getItem("augen_" + k);
+    if (v) $(k).value = v;
+    $(k).addEventListener("change", () => localStorage.setItem("augen_" + k, $(k).value.trim()));
+  }
+  const cfg = () => ({ base: $("base").value.trim().replace(/\/$/, ""), token: $("token").value.trim(), slug: $("slug").value.trim() });
+
+  let creatives = [];
+
+  $("load").onclick = async () => {
+    const { base, token, slug } = cfg();
+    if (!base || !token || !slug) { setStatus("Fill in URL, token, and brand slug.", "err"); return; }
+    setStatus("Loading…");
+    try {
+      const res = await fetch(base + "/api/plugin/creatives?brand=" + encodeURIComponent(slug), { headers: { "x-augen-token": token } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      creatives = data.creatives || [];
+      renderList();
+      setStatus(creatives.length + " creative(s) for " + (data.brand ? data.brand.name : slug), "ok");
+    } catch (e) { setStatus(e.message || "Load failed", "err"); }
+  };
+
+  function renderList() {
+    const list = $("list");
+    list.innerHTML = "";
+    creatives.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "item";
+      row.innerHTML =
+        '<img src="' + c.pngUrl + '" alt="" />' +
+        '<div class="meta"><div class="hl">' + (c.headline || "(no headline)") + '</div>' +
+        '<div class="fmt">' + c.format + " · " + c.width + "×" + c.height + " · " + c.status + "</div></div>";
+      const btn = document.createElement("button");
+      btn.textContent = "Import";
+      btn.onclick = () => importCreative(c);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+
+  async function importCreative(c) {
+    setStatus("Fetching render…");
+    try {
+      const buf = await (await fetch(c.pngUrl)).arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      parent.postMessage({ pluginMessage: { type: "import", creative: { id: c.id, format: c.format, width: c.width, height: c.height, headline: c.headline, subhead: c.subhead, cta: c.cta, eyebrow: c.eyebrow, pngBytes: bytes } } }, "*");
+    } catch (e) { setStatus("Import failed: " + (e.message || ""), "err"); }
+  }
+
+  $("send").onclick = () => { setStatus("Reading selection…"); parent.postMessage({ pluginMessage: { type: "read-selection" } }, "*"); };
+
+  // Messages back from the plugin sandbox (code.js).
+  window.onmessage = async (event) => {
+    const msg = event.data.pluginMessage;
+    if (!msg) return;
+    if (msg.type === "imported") setStatus("Imported to canvas ✓", "ok");
+    else if (msg.type === "error") setStatus(msg.message, "err");
+    else if (msg.type === "selection-copy") {
+      const { base, token } = cfg();
+      setStatus("Sending to Augen…");
+      try {
+        const res = await fetch(base + "/api/plugin/creatives/" + msg.id, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-augen-token": token },
+          body: JSON.stringify(msg.copy),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+        setStatus("Saved to Augen ✓ — re-render to see it.", "ok");
+      } catch (e) { setStatus("Save failed: " + (e.message || ""), "err"); }
+    }
+  };
+</script>
+</body>
+</html>

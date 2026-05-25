@@ -1,0 +1,12 @@
+{
+  "name": "Augen",
+  "id": "augen-creative-bridge",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "reasoning": "Fetches your Augen creatives + their rendered previews and posts copy edits back to your Augen instance. Lock this to your own Augen domain before sharing the plugin."
+  }
+}

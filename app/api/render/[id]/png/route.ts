@@ -40,6 +40,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       "Content-Type": "image/png",
       "Content-Disposition": `inline; filename="${gen.id}.png"`,
       "Cache-Control": "public, max-age=300",
+      // Allow the Figma plugin (opaque origin) to read the bytes for an image fill.
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }
