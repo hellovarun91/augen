@@ -57,6 +57,28 @@ A row with name "India" × 4 sizes = 4 designs, all sharing India's copy. 8 rows
   - Edit the master look → **all** designs go stale → "Re-render all?".
   - Re-rendering is always deliberate. No silent credit spend, approvals stay honest.
 
+## Media / assets in the sheet
+
+- The **master holds one shared image** — the default for every row (this is the "one concept" consistency).
+- A row's optional **Image cell overrides** it on demand, via a small picker with four sources:
+  - **Library** — the brand's saved/uploaded assets
+  - **Stock** — Pexels search (already wired via `add_stock_reference`)
+  - **Generate** — Gemini, prompt → image, *conditioned on the brand's reference photos* for subject consistency
+  - **Upload** — direct file
+- The cell stores a **pointer** to the asset (lives in `AUGEN_DATA_DIR/refs`, the single-volume layout), not the bytes.
+- Media obeys the integrity rule: change a row's media → that row's designs go **stale** → "re-render?". Never silent.
+- Stance: **consistency by default, freedom on demand** — you reach for per-row imagery deliberately, not as the norm.
+
+## In-cell AI (task #54 — fast-follow after the loop is solid)
+
+Surface the agents we already have *inside* the cells. No new agents.
+
+- **Copy actions** — ✨ on any copy cell → Punchier / Shorter / Longer / Match-brand-voice / Localize / Rewrite-from-a-hint. Runs the copywriter agent on that cell with brand voice + the row's *other* cells as context. **Proposes a diff to accept/reject — never silent overwrite.** Plus a row-level "draft this whole row from an angle" (the Ideate handoff in miniature).
+- **Media generation in a cell** — the Generate path above, conditioned on brand refs. Also closes half of the imagery-quality gap (#52).
+- **Inline AI review** — the copy critic runs **per row** → a score + "what to fix" chip + one-click "apply suggestion" (proposes an edit). The sheet becomes a review surface for the **words**; the Review step keeps owning the **visuals** (per-design vision QC). Maps onto: row owns copy, design owns visual.
+
+Sequencing: build **after** the journey works (#46–#50), since it reuses the copywriter, critic, and Gemini and layers cleanly onto a working sheet + designs.
+
 ## Build order (maps to tasks)
 
 | # | Task | Depends on |
@@ -67,8 +89,9 @@ A row with name "India" × 4 sizes = 4 designs, all sharing India's copy. 8 rows
 | 49 | Approval + sync model (row owns copy; visual per design; edit→row→siblings; stale-on-edit) | 46 |
 | 50 | Sequence the guided journey + gate Deliverables (fully-approved only; download / Figma) | 47, 49 |
 | 51 | Live copy editing on the creative (Review) | 49 |
+| 54 | In-cell AI: copy actions + media generation + inline review | 50 |
 
-Critical path: **46 → 47/49 → 50.** 48 (Ideate) and the independent quality/security items (#52 imagery gap, #53 Figma plugin networkAccess) can run in parallel.
+Critical path: **46 → 47/49 → 50.** 48 (Ideate) and the independent quality/security items (#52 imagery gap, #53 Figma plugin networkAccess) can run in parallel. #54 is a fast-follow once the loop is solid.
 
 ## Deliberately deferred (not in this pass)
 
