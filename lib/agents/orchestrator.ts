@@ -6,7 +6,7 @@ import { runCopywriter } from "./copywriter";
 import { runCriticBatch } from "./critic";
 import type { ArtDirectorOutput, CopywriterOutput, CopyVariant, CriticOutput } from "./types";
 import { formatBySlug, type FormatSpec } from "@/lib/formats";
-import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference, createReference, recordVisionReview } from "@/lib/repo";
+import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference, createReference, recordVisionReview, recordAgentRevision } from "@/lib/repo";
 import { generateImage, saveBytes } from "@/lib/images/providers";
 import type { AgentProvider } from "./types";
 import { claudeModel, getClaude } from "./adapters/claude";
@@ -16,6 +16,10 @@ import { runVisionCritic } from "./vision-critic";
 
 // Vision QC inline in bulk generation is opt-in (cost + latency per ad).
 const VISION_QC_INLINE = /^(1|true|on|yes)$/i.test(process.env.AUGEN_VISION_QC || "");
+// Agentic revise loop: re-write ads the critic flags "revise". On by default
+// (only fires on weak ads, one pass); set AUGEN_REVISE=0 to disable.
+const REVISE_ENABLED = !/^(0|false|off|no)$/i.test(process.env.AUGEN_REVISE || "");
+const REVISE_MAX = (() => { const v = parseInt(process.env.AUGEN_REVISE_MAX || "", 10); return Number.isFinite(v) && v > 0 ? v : 12; })();
 
 function currentProvider(): AgentProvider {
   return getClaude()
@@ -70,9 +74,11 @@ export async function generateAdsViaAgents(args: {
     fmt: FormatSpec;
     formatSlug: string;
     v: number;
+    product: string;
     art: ArtDirectorOutput;
     variants: CopyVariant[];
     chosen: CopyVariant;
+    revised?: boolean;
   };
   const pending: PendingAd[] = [];
 
@@ -127,7 +133,7 @@ export async function generateAdsViaAgents(args: {
         });
         copyRunIds.push(copy.runId);
 
-        pending.push({ idea, fmt, formatSlug, v, art: art.output, variants: copy.output.variants, chosen: copy.output.variants[0] });
+        pending.push({ idea, fmt, formatSlug, v, product, art: art.output, variants: copy.output.variants, chosen: copy.output.variants[0] });
       }
     }
   }
@@ -153,6 +159,54 @@ export async function generateAdsViaAgents(args: {
     });
     criticRunIds.push(batch.runId);
     batch.output.critiques.forEach((c, j) => { critiques[start + j] = c; });
+  }
+
+  // ---- Phase 2b: bounded agentic revise loop. For ads the critic flagged
+  // "revise", re-run the Copywriter with the revision note as a constraint, then
+  // re-critique just those — so the chain self-corrects before anything ships.
+  if (REVISE_ENABLED) {
+    const toRevise: number[] = [];
+    for (let i = 0; i < pending.length; i++) {
+      const c = critiques[i];
+      if (c && c.verdict === "revise" && c.revisionNote && toRevise.length < REVISE_MAX) toRevise.push(i);
+    }
+    if (toRevise.length) {
+      for (const i of toRevise) {
+        const p = pending[i];
+        const note = critiques[i].revisionNote!;
+        const constraint = [args.copyConstraint, `Revision: ${note}`].filter(Boolean).join(" — ");
+        const recopy = await recordRun({
+          kind: "copywriter",
+          chainId,
+          brandId: args.brand.id,
+          campaignId: args.campaignId,
+          ideaId: p.idea.id,
+          userId: args.userId,
+          provider,
+          input: { idea: p.idea.theme, product: p.product, formatSlug: p.formatSlug, count: 3, constraint, revise: true },
+          fn: () => runCopywriter({ brand: args.brand, language: args.brand.language, idea: p.idea, product: p.product, formatSlug: p.formatSlug, variantIndex: p.v, count: 3, constraints: constraint }),
+        });
+        copyRunIds.push(recopy.runId);
+        pending[i] = { ...p, variants: recopy.output.variants, chosen: recopy.output.variants[0], revised: true };
+      }
+      // Re-score only the revised ads, in one batch, and replace their critiques.
+      const reBatch = await recordRun({
+        kind: "critic",
+        chainId,
+        brandId: args.brand.id,
+        campaignId: args.campaignId,
+        userId: args.userId,
+        provider,
+        input: { revised: toRevise.length },
+        fn: () => runCriticBatch({
+          brand: args.brand,
+          language: args.brand.language,
+          items: toRevise.map((i) => ({ formatSlug: pending[i].formatSlug, copy: pending[i].chosen, idea: pending[i].idea })),
+        }),
+      });
+      criticRunIds.push(reBatch.runId);
+      reBatch.output.critiques.forEach((c, j) => { critiques[toRevise[j]] = c; });
+    }
   }
 
   // ---- Phase 3: persist each generation, bill, and resolve a reference image.
@@ -186,6 +240,9 @@ export async function generateAdsViaAgents(args: {
     if (getBilling(args.brand.id)) {
       chargeBilling(args.brand.id, COST_PER_AD_CENTS, `Generation · ${p.fmt.name}`, gen.id);
     }
+
+    // Note any auto-revision in the review timeline (trust + traceability).
+    if (p.revised) recordAgentRevision(gen.id, "Copy auto-revised on the critic's note, then re-scored.");
 
     // Resolve a reference image for this generation.
     // Priority: pre-loaded library refs (round-robin) > Gemini fresh generation > SVG fallback.

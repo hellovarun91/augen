@@ -370,6 +370,13 @@ export function deleteFigmaWebhook(brandId: string) {
   db().prepare("DELETE FROM figma_webhooks WHERE brand_id = ?").run(brandId);
 }
 
+// Logs that the agentic chain auto-revised a creative (shows in the review timeline).
+export function recordAgentRevision(generationId: string, note: string) {
+  const rev = `rev_${nanoid(8)}`;
+  db().prepare("INSERT INTO reviews (id, generation_id, action, note, reviewer, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(rev, generationId, "auto-revised", note || null, "auto-revise", nowMs());
+}
+
 // Persist a Vision QC critique: store the design score + notes on the generation,
 // and log a review row attributed to "vision-critic" so it shows in the timeline.
 export function recordVisionReview(generationId: string, input: { score: number; verdict: string; notes: string[]; fixes?: string[] }) {

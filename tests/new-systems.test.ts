@@ -178,6 +178,29 @@ describe("vision QC critic (heuristic fallback)", () => {
   });
 });
 
+describe("agentic revise loop (#42)", () => {
+  it("critic flags an overlong banner headline (not ship) with guidance", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const { runCriticBatch } = await import("@/lib/agents/critic");
+    const brand = fakeBrand();
+    const copy = { eyebrow: "NEW", headline: "A dramatically long headline that will never fit a leaderboard banner crop", subhead: "x", cta: "Go" };
+    const out = (await runCriticBatch({ brand, language: brand.language, items: [{ formatSlug: "google-display-728x90", copy }] })).output.critiques[0];
+    expect(out.verdict).not.toBe("ship");
+    expect((out.revisionNote || out.notes.join(" ")).length).toBeGreaterThan(0);
+  });
+
+  it("copywriter re-writes when handed a revision constraint", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const { runCopywriter } = await import("@/lib/agents/copywriter");
+    const brand = fakeBrand();
+    const idea: any = { id: "i", theme: "Open Window", insight: "", angle: "Functional benefit", audience: "Tasteful 28-45", promise: "", hooks: [], visualDirection: "" };
+    const args = { brand, language: brand.language, idea, product: "goods", formatSlug: "google-display-728x90", variantIndex: 0, count: 3 };
+    const base = (await runCopywriter(args)).output.variants[0];
+    const revised = (await runCopywriter({ ...args, constraints: "Revision: Tighter headline ≤ 28 chars" })).output.variants[0];
+    expect(revised.headline).not.toBe(base.headline);
+  });
+});
+
 describe("MCP tool contract", () => {
   it("exposes well-formed, uniquely-named tools", async () => {
     const { TOOL_DEFS } = await import("@/lib/mcp/tools");
