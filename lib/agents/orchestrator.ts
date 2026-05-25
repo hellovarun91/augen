@@ -6,12 +6,16 @@ import { runCopywriter } from "./copywriter";
 import { runCriticBatch } from "./critic";
 import type { ArtDirectorOutput, CopywriterOutput, CopyVariant, CriticOutput } from "./types";
 import { formatBySlug, type FormatSpec } from "@/lib/formats";
-import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference, createReference } from "@/lib/repo";
+import { chargeBilling, createGeneration, createIdea, listIdeas, setCampaignStatus, getBilling, listReferences, updateGenerationReference, createReference, recordVisionReview } from "@/lib/repo";
 import { generateImage, saveBytes } from "@/lib/images/providers";
 import type { AgentProvider } from "./types";
 import { claudeModel, getClaude } from "./adapters/claude";
 import { recordSpend } from "@/lib/spend";
 import { imagePriceMicros } from "./pricing";
+import { runVisionCritic } from "./vision-critic";
+
+// Vision QC inline in bulk generation is opt-in (cost + latency per ad).
+const VISION_QC_INLINE = /^(1|true|on|yes)$/i.test(process.env.AUGEN_VISION_QC || "");
 
 function currentProvider(): AgentProvider {
   return getClaude()
@@ -43,6 +47,7 @@ export async function generateAdsViaAgents(args: {
   variantsPerFormat?: number;
   copyConstraint?: string;
   userId?: string;
+  baseUrl?: string; // origin for rendering composites (inline vision QC)
 }): Promise<GenerateChainResult> {
   const ideas = listIdeas(args.campaignId);
   if (!ideas.length) {
@@ -209,6 +214,23 @@ export async function generateAdsViaAgents(args: {
         });
         updateGenerationReference(gen.id, ref.id);
       }
+    }
+
+    // ---- Optional inline Vision QC: score the rendered composite (design, not
+    // just copy). Opt-in via AUGEN_VISION_QC; needs a base URL to render the PNG.
+    if (VISION_QC_INLINE && args.baseUrl) {
+      try {
+        const res = await fetch(`${args.baseUrl}/api/render/${gen.id}/png`, { cache: "no-store" });
+        if (res.ok) {
+          const png = { bytes: Buffer.from(await res.arrayBuffer()), mime: "image/png" };
+          const { output } = await runVisionCritic({
+            brand: args.brand, language: args.brand.language, formatSlug: p.formatSlug,
+            copy: { eyebrow: p.chosen.eyebrow, headline: p.chosen.headline, subhead: p.chosen.subhead, cta: p.chosen.cta },
+            png,
+          });
+          recordVisionReview(gen.id, { score: output.overallScore, verdict: output.verdict, notes: output.notes, fixes: output.fixes });
+        }
+      } catch { /* non-fatal — design score stays unset */ }
     }
 
     count++;

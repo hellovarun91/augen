@@ -3,6 +3,7 @@ import { generateAdsViaAgents, strategistOnly } from "@/lib/agents/orchestrator"
 import { getBrand, getCampaign, upsertCampaignFormat, signOffCampaign, clearCampaignSignoff } from "@/lib/repo";
 import { db, nowMs } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { requireCampaignAccess } from "@/lib/authz";
 import { chargeCredits, quoteCost, refundCredits } from "@/lib/credits";
 import { rateLimit } from "@/lib/ratelimit";
@@ -23,6 +24,10 @@ export async function runCampaignAction(campaignId: string, copyConstraint?: str
   const v = variantsPerFormat ? parseInt(variantsPerFormat, 10) : 1;
 
   const t0 = Date.now();
+  const h = await headers();
+  const host = h.get("x-forwarded-host") || h.get("host");
+  const proto = h.get("x-forwarded-proto") || (host?.startsWith("localhost") ? "http" : "https");
+  const baseUrl = host ? `${proto}://${host}` : undefined;
   const result = await generateAdsViaAgents({
     campaignId,
     brand: b,
@@ -30,6 +35,7 @@ export async function runCampaignAction(campaignId: string, copyConstraint?: str
     variantsPerFormat: v,
     copyConstraint,
     userId: user.id,
+    baseUrl,
   });
   void track(user.id, "generate_ads", {
     campaign_id: campaignId, brand_id: b.id,
