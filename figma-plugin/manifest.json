@@ -7,6 +7,7 @@
   "editorType": ["figma"],
   "networkAccess": {
     "allowedDomains": ["*"],
+    "devAllowedDomains": ["http://localhost:3000", "http://localhost:*", "https://localhost:*"],
     "reasoning": "Fetches your Augen creatives + their rendered previews and posts copy edits back to your Augen instance. Lock this to your own Augen domain before sharing the plugin."
   }
 }

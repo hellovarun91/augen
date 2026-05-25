@@ -78,9 +78,11 @@
   const token = () => ls.get("token");
   const authHeaders = () => ({ "x-augen-token": token() });
 
-  // restore advanced URL override
+  // restore advanced URL override — save on every keystroke/paste, not just blur
   if (ls.get("base")) $("base").value = ls.get("base");
-  $("base").addEventListener("change", () => ls.set("base", $("base").value.trim()));
+  const saveBase = () => ls.set("base", $("base").value.trim());
+  $("base").addEventListener("input", saveBase);
+  $("base").addEventListener("change", saveBase);
 
   let creatives = [];
 
@@ -91,15 +93,20 @@
 
   // ---- Connect (device authorization) ----
   $("connect").onclick = async () => {
-    setStatus("Starting…");
+    setStatus("Connecting to " + base() + " …");
+    let data;
     try {
       const r = await fetch(base() + "/api/plugin/connect/start", { method: "POST" });
-      const data = await r.json();
-      if (!r.ok || !data.code) throw new Error(data.error || "Could not start");
-      try { window.open(data.verifyUrl, "_blank"); } catch (e) {}
-      setStatus('Approve in your browser, then come back. <a href="' + data.verifyUrl + '" target="_blank">Open the approval page</a>', "");
-      pollConnect(data.code, 0);
-    } catch (e) { setStatus("Connect failed: " + (e.message || ""), "err"); }
+      data = await r.json();
+      if (!r.ok || !data.code) throw new Error((data && data.error) || ("HTTP " + r.status));
+    } catch (e) {
+      setStatus("Couldn't reach " + base() + " — " + (e.message || "network blocked") + ". If this is localhost: re-import the plugin (so it picks up devAllowedDomains) and make sure the dev server is running.", "err");
+      return;
+    }
+    try { window.open(data.verifyUrl, "_blank"); } catch (e) {}
+    // window.open is often blocked in Figma — the link below is the reliable path.
+    setStatus('<a href="' + data.verifyUrl + '" target="_blank" style="display:inline-block;background:#4f46e5;color:#fff;padding:7px 12px;border-radius:7px;text-decoration:none">Open approval page →</a><div style="margin-top:6px;color:#9a9aa2">Sign in / Approve there, then come back — waiting…</div>', "");
+    pollConnect(data.code, 0);
   };
 
   function pollConnect(code, tries) {
