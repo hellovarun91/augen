@@ -1,66 +1,43 @@
 import { Card, Eyebrow, Section } from "@/components/ui/primitives";
 import { getBrandBySlug } from "@/lib/repo";
-import { planQuarter } from "@/lib/ai/planner";
 import { notFound } from "next/navigation";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
-import { PlannerControls, PlannerWorkspace, type Proposal } from "./controls";
+import { PlannerClient } from "./controls";
 
 export const dynamic = "force-dynamic";
 
-export default async function PlanPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string>> }) {
+export default async function PlanPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const sp = await searchParams;
   const brand = getBrandBySlug(slug);
   if (!brand) notFound();
-
-  const now = new Date();
-  const defaultQ = (Math.floor(now.getMonth() / 3) + 1) as 1 | 2 | 3 | 4;
-  const defaultNext = (defaultQ === 4 ? 1 : defaultQ + 1) as 1 | 2 | 3 | 4;
-  const year = parseInt(sp.year || `${now.getFullYear()}`, 10);
-  const quarter = (sp.q as "Q1" | "Q2" | "Q3" | "Q4") || (`Q${defaultNext}` as "Q1" | "Q2" | "Q3" | "Q4");
-  const count = Math.max(1, Math.min(6, parseInt(sp.count || "3", 10) || 3));
-
-  // Money (budget/KPIs/channels) intentionally dropped — the studio stays design-first.
-  const proposals: Proposal[] = planQuarter(brand, year, quarter, count).map((p, i) => ({
-    id: String(i),
-    name: p.name,
-    objective: p.objective,
-    audience: p.audience,
-    productFocus: p.productFocus,
-    rationale: p.rationale,
-    ideas: p.ideas,
-  }));
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-8">
       <SyncActiveBrand brandId={brand.id} />
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
-        <div>
-          <Eyebrow>{brand.name} · AI planner</Eyebrow>
-          <h1 className="serif text-display-lg mt-1 tracking-tight">Draft a few projects</h1>
-          <p className="text-ink-300 mt-2 max-w-2xl">
-            A starting set for {quarter} {year} — one to build awareness, one to nurture, one to convert. Rename them, drop what
-            you don't want, then add the rest to your Studio. You can always create projects by hand too.
-          </p>
-        </div>
-        <PlannerControls slug={brand.slug} currentQ={quarter} currentYear={year} currentCount={count} />
+      <div>
+        <Eyebrow>{brand.name} · AI planner</Eyebrow>
+        <h1 className="serif text-display-lg mt-1 tracking-tight">Turn a goal into projects</h1>
+        <p className="text-ink-300 mt-2 max-w-2xl">
+          Tell the planner what you're working toward — a launch, a seasonal push, an offer — and it drafts a few
+          build-ready projects in {brand.name}'s voice. Keep the ones you like; each becomes a Project you generate ads in.
+        </p>
       </div>
 
-      <PlannerWorkspace brandId={brand.id} proposals={proposals} />
+      <PlannerClient brandId={brand.id} />
 
-      <Section title="How the planner thinks">
+      <Section title="How it works">
         <Card className="p-6 grid md:grid-cols-3 gap-6 text-sm">
           <div>
-            <Eyebrow>A seasonal mood</Eyebrow>
-            <p className="text-ink-200 mt-2">Each quarter has a feel — renewal, outward, abundant, gathered. Themes start there, then bend toward your brand's voice.</p>
+            <Eyebrow>1 · Say the goal</Eyebrow>
+            <p className="text-ink-200 mt-2">Plain language is fine — "spring launch, push samples." The planner reads your brand's voice and audience alongside it.</p>
           </div>
           <div>
-            <Eyebrow>A natural arc</Eyebrow>
-            <p className="text-ink-200 mt-2">One project to get noticed, one to build interest, one to convert — so the work compounds across the season.</p>
+            <Eyebrow>2 · Shape the drafts</Eyebrow>
+            <p className="text-ink-200 mt-2">It proposes a few projects with idea seeds. Rename, drop, add your own, or ask for a different set — nothing is committed yet.</p>
           </div>
           <div>
-            <Eyebrow>Layered audiences</Eyebrow>
-            <p className="text-ink-200 mt-2">Audiences are drawn from your industry's profiles, then varied per idea so no two ideas chase the same person.</p>
+            <Eyebrow>3 · Send to Studio</Eyebrow>
+            <p className="text-ink-200 mt-2">Add the keepers and they become real Projects, ready for you to generate and review ads inside.</p>
           </div>
         </Card>
       </Section>

@@ -250,6 +250,92 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// ---------------------------------------------------------------------------
+// Intent-first brainstorm: turn a plain-language GOAL into ready-to-build
+// projects. Deterministic + goal-aware (so it reads as if it listened), and
+// varied by `nonce` so "give me different ones" actually changes the output.
+// The AI-backed version (lib/ai/brainstorm.ts) calls this as its fallback.
+
+export interface BrainstormInput { goal: string; count?: number; nonce?: number }
+
+const GOAL_INTENTS: { test: RegExp; arc: string[]; label: string }[] = [
+  { test: /launch|drop|introduc|debut|unveil|new (product|line|collection|range)/i, arc: ["awareness", "consideration", "conversion"], label: "launch" },
+  { test: /sale|offer|discount|promo|deal|clearance|bundle|%\s*off/i, arc: ["conversion", "conversion", "awareness"], label: "offer" },
+  { test: /sign[- ]?up|subscrib|trial|lead|waitlist|demo|register|book a/i, arc: ["consideration", "conversion", "consideration"], label: "signups" },
+  { test: /retain|loyal|win[- ]?back|repeat|reorder|churn|come back/i, arc: ["retention", "conversion", "awareness"], label: "retention" },
+  { test: /aware|reach|notice|recogni|top of mind|get seen|introduce us/i, arc: ["awareness", "awareness", "consideration"], label: "awareness" },
+];
+
+function intentForGoal(goal: string) {
+  for (const g of GOAL_INTENTS) if (g.test.test(goal)) return g;
+  return { arc: ["awareness", "consideration", "conversion"], label: "campaign" };
+}
+
+const STOPWORDS = new Set(["a", "an", "the", "of", "for", "to", "and", "our", "my", "we", "with", "on", "in", "this", "that", "new", "push", "launch", "drive", "grow", "promote", "want", "i", "need"]);
+
+// A short Title-Cased focus phrase pulled from the goal, used in names/themes.
+function goalFocusPhrase(goal: string): string {
+  const firstClause = goal.split(/[,.;\n]/)[0] || goal;
+  const words = firstClause.split(/\s+/).map((w) => w.replace(/[^A-Za-z0-9'-]/g, "")).filter(Boolean);
+  const kept = words.filter((w) => !STOPWORDS.has(w.toLowerCase())).slice(0, 4);
+  const phrase = (kept.length ? kept : words.slice(0, 3)).join(" ").trim();
+  return phrase.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const OBJECTIVE_PHRASES: Record<string, string[]> = {
+  awareness: ["Get Seen", "First Impression", "Make Noise", "Land the Idea"],
+  consideration: ["Make the Case", "Win the Second Look", "Earn the Click", "Show, Don't Tell"],
+  conversion: ["Close It", "The Push", "Last Mile", "Make the Yes Easy"],
+  retention: ["Bring Them Back", "Stay Top of Mind", "Earn the Reorder"],
+};
+const OBJECTIVE_LINE: Record<string, string> = {
+  awareness: "get the right people to notice and remember the brand.",
+  consideration: "move interested people from curious to convinced.",
+  conversion: "turn intent into the next concrete step.",
+  retention: "bring existing customers back for the next one.",
+};
+
+export function brainstormProjects(brand: Brand, input: BrainstormInput): PlannedCampaign[] {
+  const goal = (input.goal || "").trim();
+  const n = Math.max(1, Math.min(6, Math.round(input.count ?? 3)));
+  const r = rng(hashStr(`${brand.slug}|brainstorm|${goal.toLowerCase()}|${input.nonce ?? 0}`));
+  const industry = (brand.industry || "lifestyle").toLowerCase();
+  const audiences = AUDIENCES_BY_INDUSTRY[industry] || AUDIENCES_BY_INDUSTRY.lifestyle;
+  const intent = intentForGoal(goal);
+  const now = new Date();
+  const q = `Q${Math.floor(now.getMonth() / 3) + 1}` as keyof typeof SEASONAL;
+  const season = SEASONAL[q];
+  const focus = goalFocusPhrase(goal);
+
+  return Array.from({ length: n }, (_, i) => {
+    const objective = intent.arc[i % intent.arc.length];
+    const theme = (focus && i === 0) ? focus.toLowerCase() : pick(season.themes, r);
+    const audience = pick(audiences, r);
+    const ideas = synthesizeIdeas(brand, theme, season.mood, audiences, r);
+    // Offset by index so repeated objectives in the arc don't yield duplicate names.
+    const phrases = OBJECTIVE_PHRASES[objective] || OBJECTIVE_PHRASES.awareness;
+    const phrase = phrases[(Math.floor(r() * phrases.length) + i) % phrases.length];
+    const name = focus ? `${focus} — ${phrase}` : `${brand.name} — ${phrase}`;
+    const rationale = goal
+      ? `Toward your goal — "${goal}". This one drives ${objective}: ${OBJECTIVE_LINE[objective] || ""}`
+      : `A ${objective} project: ${OBJECTIVE_LINE[objective] || ""}`;
+    return {
+      name,
+      quarter: q,
+      year: now.getFullYear(),
+      objective,
+      audience,
+      productFocus: synthProducts(brand, theme, r),
+      channels: pickN(CHANNELS_BY_OBJ[objective] || CHANNELS_BY_OBJ.awareness, 3, r),
+      formats: FORMATS_DEFAULT,
+      budget: 0,
+      kpis: pickN(KPI_BANK, 3, r),
+      rationale,
+      ideas,
+    };
+  });
+}
+
 export function plannedToBrief(p: PlannedCampaign): CampaignBrief {
   return {
     objective: p.objective,

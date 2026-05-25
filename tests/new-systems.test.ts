@@ -215,3 +215,32 @@ describe("planner count control (#31)", () => {
     expect(objs).toEqual(["awareness", "consideration", "conversion", "awareness", "consideration", "conversion"]);
   });
 });
+
+describe("intent-first brainstorm (planner redesign)", () => {
+  it("shapes the objective arc to the goal's intent", async () => {
+    const { brainstormProjects } = await import("@/lib/ai/planner");
+    const brand = fakeBrand();
+    const launch = brainstormProjects(brand, { goal: "Launch our new citrus line", count: 3 }).map((p) => p.objective);
+    const sale = brainstormProjects(brand, { goal: "End of season sale, 30% off", count: 3 }).map((p) => p.objective);
+    expect(launch[0]).toBe("awareness");          // a launch opens by getting noticed
+    expect(sale[0]).toBe("conversion");           // a sale opens by pushing the close
+    expect(launch).not.toEqual(sale);
+  });
+
+  it("weaves the goal into names + rationale and respects count", async () => {
+    const { brainstormProjects } = await import("@/lib/ai/planner");
+    const out = brainstormProjects(fakeBrand(), { goal: "Spring citrus launch", count: 4 });
+    expect(out).toHaveLength(4);
+    expect(out[0].name.toLowerCase()).toContain("citrus");
+    expect(out[0].rationale.toLowerCase()).toContain("citrus");
+    // names within a batch are distinct (no duplicate "Close It" collisions)
+    expect(new Set(out.map((p) => p.name)).size).toBe(out.length);
+  });
+
+  it("nonce varies the output (give me different ones)", async () => {
+    const { brainstormProjects } = await import("@/lib/ai/planner");
+    const a = brainstormProjects(fakeBrand(), { goal: "Grow awareness", count: 3, nonce: 0 }).map((p) => p.name).join("|");
+    const b = brainstormProjects(fakeBrand(), { goal: "Grow awareness", count: 3, nonce: 1 }).map((p) => p.name).join("|");
+    expect(a).not.toBe(b);
+  });
+});

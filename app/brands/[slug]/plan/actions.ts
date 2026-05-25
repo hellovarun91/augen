@@ -4,6 +4,7 @@ import { defaultFormatSlugs } from "@/lib/formats";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireBrandAccess } from "@/lib/authz";
+import { brainstormProjectsAI } from "@/lib/ai/brainstorm";
 
 export interface PlanPick {
   name: string;
@@ -11,6 +12,26 @@ export interface PlanPick {
   audience: string;
   productFocus: string[];
   ideas: Array<{ theme: string; insight: string; angle: string; audience: string; promise: string; hooks: string[]; visualDirection: string }>;
+}
+
+export type BrainstormProposal = PlanPick & { id: string; rationale: string };
+
+// Intent-first brainstorm: turn the user's goal into build-ready project drafts.
+// `nonce` lets "give me different ones" vary the output.
+export async function brainstormAction(brandId: string, goal: string, count: number, nonce: number): Promise<BrainstormProposal[]> {
+  await requireBrandAccess(brandId);
+  const brand = getBrand(brandId);
+  if (!brand) throw new Error("Brand not found");
+  const projects = await brainstormProjectsAI(brand, { goal, count, nonce });
+  return projects.map((p, i) => ({
+    id: `p${nonce}_${i}`,
+    name: p.name,
+    objective: p.objective,
+    audience: p.audience,
+    productFocus: p.productFocus,
+    rationale: p.rationale,
+    ideas: p.ideas,
+  }));
 }
 
 // Create the projects the operator selected (and possibly renamed) from the
