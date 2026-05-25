@@ -37,7 +37,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Augen ↔ Figma <span style="color:#6a6a72;font-weight:400;font-size:10px">· v4</span></h1>
+  <h1>Augen ↔ Figma <span style="color:#6a6a72;font-weight:400;font-size:10px">· v5</span></h1>
   <p class="sub">Pull an Augen creative onto the canvas, edit copy & layout, push it back.</p>
 
   <!-- Not connected -->
@@ -61,7 +61,9 @@
     <div class="connected"><span><b>Connected</b> · <span id="who">your account</span></span><button class="link-btn" id="disconnect">disconnect</button></div>
     <label>Brand</label>
     <select id="brand"></select>
-    <div class="bar">
+    <button id="pulltokens" class="ghost block" style="margin-top:8px">Pull design tokens from this file → Augen</button>
+    <div class="or">creatives</div>
+    <div class="bar" style="margin-top:0">
       <button id="load">Load creatives</button>
       <button id="send" class="ghost">Send selection → Augen</button>
     </div>
@@ -200,6 +202,7 @@
   }
 
   $("send").onclick = () => { setStatus("Reading selection…"); parent.postMessage({ pluginMessage: { type: "read-selection" } }, "*"); };
+  $("pulltokens").onclick = () => { setStatus("Reading this file's variables…"); parent.postMessage({ pluginMessage: { type: "read-tokens" } }, "*"); };
 
   // ---- Messages from the sandbox (code.js) ----
   window.onmessage = async (event) => {
@@ -207,6 +210,21 @@
     if (!msg) return;
     if (msg.type === "imported") setStatus("Imported to canvas ✓", "ok");
     else if (msg.type === "error") setStatus(msg.message, "err");
+    else if (msg.type === "tokens") {
+      const slug = $("brand").value;
+      if (!slug) { setStatus("Pick a brand first.", "err"); return; }
+      setStatus("Sending " + Object.keys(msg.flat || {}).length + " variable(s) to Augen…");
+      try {
+        const res = await fetch(base() + "/api/plugin/tokens", {
+          method: "POST",
+          headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+          body: JSON.stringify({ brand: slug, vars: msg.flat || {} }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+        setStatus(data.changed ? ("Updated design tokens ✓ — " + data.groups.join(", ")) : (data.message || "No mappable variables found."), data.changed ? "ok" : "err");
+      } catch (e) { setStatus("Token sync failed: " + (e.message || ""), "err"); }
+    }
     else if (msg.type === "selection-copy") {
       setStatus("Sending to Augen…");
       try {

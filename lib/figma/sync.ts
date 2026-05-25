@@ -86,6 +86,15 @@ function rgbToHex(r: number, g: number, b: number): string {
   return `#${to(r)}${to(g)}${to(b)}`.toUpperCase();
 }
 
+// Maps a flat { variableName: resolvedValue } record (as read by the Figma
+// PLUGIN API — works on any plan) into a partial BrandTokens via the same
+// naming convention as the REST pull.
+export function partialTokensFromVars(vars: Record<string, string | number>): Partial<BrandTokens> {
+  const flat = new Map<string, { type: string; raw: any; resolved: any }>();
+  for (const [name, value] of Object.entries(vars)) flat.set(name, { type: "", raw: value, resolved: value });
+  return mapToTokens(flat, []);
+}
+
 // Maps Figma Variable names (slash-namespaced) into BrandTokens.
 // Conventions:
 //   color/background, color/surface, color/foreground, color/primary, color/secondary, color/accent, color/muted

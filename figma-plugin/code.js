@@ -113,10 +113,46 @@ function readSelection() {
   figma.ui.postMessage({ type: "selection-copy", id: id, copy: copy, layout: layout });
 }
 
+function rgbaToHex(c) {
+  const to = (n) => Math.max(0, Math.min(255, Math.round(n * 255))).toString(16).padStart(2, "0");
+  return "#" + to(c.r) + to(c.g) + to(c.b);
+}
+
+// Reads this file's local Variables (works on any Figma plan, unlike the REST
+// Variables API) and sends a flat { name: resolvedValue } map to the UI.
+async function readTokens() {
+  if (!figma.variables || !figma.variables.getLocalVariablesAsync) {
+    figma.ui.postMessage({ type: "error", message: "This Figma version doesn't expose Variables to plugins." });
+    return;
+  }
+  const collections = await figma.variables.getLocalVariableCollectionsAsync();
+  const colById = {};
+  collections.forEach((c) => { colById[c.id] = c; });
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const flat = {};
+  for (const v of vars) {
+    const col = colById[v.variableCollectionId];
+    let modeId = (col && col.defaultModeId) || Object.keys(v.valuesByMode)[0];
+    let val = v.valuesByMode[modeId];
+    let guard = 0;
+    while (val && typeof val === "object" && val.type === "VARIABLE_ALIAS" && guard++ < 6) {
+      const t = await figma.variables.getVariableByIdAsync(val.id);
+      if (!t) { val = null; break; }
+      const tcol = colById[t.variableCollectionId];
+      const tmode = (tcol && tcol.defaultModeId) || Object.keys(t.valuesByMode)[0];
+      val = t.valuesByMode[tmode];
+    }
+    if (val && typeof val === "object" && typeof val.r === "number") flat[v.name] = rgbaToHex(val);
+    else if (typeof val === "number" || typeof val === "string") flat[v.name] = val;
+  }
+  figma.ui.postMessage({ type: "tokens", flat: flat, count: vars.length });
+}
+
 figma.ui.onmessage = async (msg) => {
   try {
     if (msg.type === "import") await importCreative(msg.creative);
     else if (msg.type === "read-selection") readSelection();
+    else if (msg.type === "read-tokens") await readTokens();
     else if (msg.type === "notify") figma.notify(msg.message);
     else if (msg.type === "close") figma.closePlugin();
   } catch (e) {
