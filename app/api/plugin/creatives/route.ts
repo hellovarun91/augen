@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getBrandBySlug, listCampaignsByBrand, listGenerationsByCampaign, hasBrandAccess } from "@/lib/repo";
 import { formatBySlug } from "@/lib/formats";
-import { pluginUser, pluginJson, pluginPreflight } from "@/lib/plugin";
+import { pluginUser, pluginJson, pluginPreflight, publicOrigin } from "@/lib/plugin";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   if (!brand) return pluginJson({ error: `No brand with slug "${slug}".` }, 404);
   if (!hasBrandAccess(userId, brand.id)) return pluginJson({ error: "You don't have access to that brand." }, 403);
 
-  const origin = `${url.protocol}//${url.host}`;
+  const origin = publicOrigin(req);
   const creatives = listCampaignsByBrand(brand.id)
     .flatMap((c) => listGenerationsByCampaign(c.id))
     .map((g) => {

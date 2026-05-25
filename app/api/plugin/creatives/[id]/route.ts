@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getGeneration, updateGenerationCopy, getGenerationOverrides, updateGenerationOverrides, hasBrandAccess } from "@/lib/repo";
-import { pluginUser, pluginJson, pluginPreflight } from "@/lib/plugin";
+import { pluginUser, pluginJson, pluginPreflight, publicOrigin } from "@/lib/plugin";
 import { parseOverrides, mergeOverrides } from "@/lib/composer/overrides";
 import { revalidatePath } from "next/cache";
 
@@ -44,6 +44,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
   revalidatePath(`/ads/${id}`);
 
-  const origin = `${new URL(req.url).protocol}//${new URL(req.url).host}`;
-  return pluginJson({ ok: true, id, pngUrl: `${origin}/api/render/${id}/png?t=${Date.now()}` });
+  return pluginJson({ ok: true, id, pngUrl: `${publicOrigin(req)}/api/render/${id}/png?t=${Date.now()}` });
 }

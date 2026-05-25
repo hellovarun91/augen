@@ -18,6 +18,15 @@ export function pluginUser(req: NextRequest): string | null {
   return token ? resolveApiToken(token) : null;
 }
 
+// The public origin, honoring Railway's proxy headers (req.url is the internal
+// 0.0.0.0:PORT bind address behind the proxy, which is useless in returned URLs).
+export function publicOrigin(req: NextRequest): string {
+  const h = req.headers;
+  const host = h.get("x-forwarded-host") || h.get("host") || new URL(req.url).host;
+  const proto = h.get("x-forwarded-proto") || (/^(localhost|127\.|0\.0\.0\.0)/.test(host) ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
 export function pluginJson(obj: unknown, status = 200) {
   return new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", ...PLUGIN_CORS } });
 }
