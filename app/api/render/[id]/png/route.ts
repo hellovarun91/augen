@@ -34,7 +34,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     placedAssets: resolvePlacedAssets(overrides.placedAssets),
   });
 
-  const png = await rasterizeSvg(svg, { width: Math.min(gen.width, 2048), inlineReferences: true });
+  const reqW = parseInt(new URL(req.url).searchParams.get("w") || "", 10);
+  const targetW = Number.isFinite(reqW) && reqW >= 64 ? Math.min(gen.width, reqW) : Math.min(gen.width, 2048);
+  const png = await rasterizeSvg(svg, { width: targetW, inlineReferences: true });
   return new Response(new Uint8Array(png), {
     headers: {
       "Content-Type": "image/png",

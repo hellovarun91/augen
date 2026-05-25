@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { resolveApiToken } from "@/lib/repo";
 import { TOOL_DEFS, callTool } from "@/lib/mcp/tools";
+import { publicOrigin } from "@/lib/plugin";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
         const args = params?.arguments || {};
         if (!name) return rpcError(id, -32602, "Missing tool name.");
         try {
-          const result = await callTool(userId, name, args);
+          const result = await callTool(userId, name, args, publicOrigin(req));
           return rpc(id, result);
         } catch (e: any) {
           // Tool-level failures are returned as a tool result with isError, per MCP.

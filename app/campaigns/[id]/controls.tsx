@@ -101,16 +101,46 @@ export function ProjectSignoff({
 export function RunCampaignButton({ campaignId, ideaCount }: { campaignId: string; ideaCount: number }) {
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  const [prog, setProg] = useState<{ elapsed: number; runs: number; ads: number } | null>(null);
+  const router = useRouter();
+
+  function run() {
+    setErr(null);
+    const t0 = Date.now();
+    setProg({ elapsed: 0, runs: 0, ads: 0 });
+    const iv = setInterval(async () => {
+      const elapsed = Math.floor((Date.now() - t0) / 1000);
+      try {
+        const r = await fetch(`/api/campaigns/${campaignId}/genstatus?since=${t0}`, { cache: "no-store" });
+        if (r.ok) { const d = await r.json(); setProg({ elapsed, runs: d.runs, ads: d.ads }); }
+        else setProg((p) => (p ? { ...p, elapsed } : p));
+      } catch { setProg((p) => (p ? { ...p, elapsed } : p)); }
+    }, 2000);
+    start(async () => {
+      try { await runCampaignAction(campaignId); }
+      catch (e: any) { if (!e?.digest?.startsWith?.("NEXT_REDIRECT")) setErr(e?.message || "Run failed"); }
+      finally { clearInterval(iv); setProg(null); router.refresh(); }
+    });
+  }
+
+  const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
   return (
-    <form
-      action={() => start(async () => {
-        setErr(null);
-        try { await runCampaignAction(campaignId); } catch (e: any) { setErr(e?.message || "Run failed"); }
-      })}
-    >
+    <form action={() => run()}>
       <Button type="submit" size="md" disabled={pending || ideaCount === 0}>
-        {pending ? "Generating…" : "Generate ads →"}
+        {pending ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+            Generating…
+          </span>
+        ) : "Generate ads →"}
       </Button>
+      {pending && (
+        <div className="text-[11px] text-ink-400 mt-1.5 tabular-nums">
+          {prog ? `${mmss(prog.elapsed)} · ${prog.runs} agent step${prog.runs === 1 ? "" : "s"} · ${prog.ads} ad${prog.ads === 1 ? "" : "s"} rendered` : "starting…"}
+          <div className="text-ink-500">Real AI — usually 1–3 min. Ads land when the chain finishes.</div>
+        </div>
+      )}
       {err && <div className="text-xs text-rose-300 mt-1">{err}</div>}
     </form>
   );

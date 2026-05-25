@@ -60,6 +60,13 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         </div>
       </header>
 
+      {campaign.status === "generating" && (
+        <div className="rounded-xl ring-1 ring-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm text-amber-100 flex items-center gap-2.5">
+          <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-300 border-t-transparent animate-spin shrink-0" />
+          Generating ads — the agent chain is running. Refresh in a minute; the creatives appear here when it finishes.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="p-5"><Eyebrow>Audience</Eyebrow><div className="text-base mt-1 truncate">{campaign.audience || "—"}</div></Card>
         <Card className="p-5"><Eyebrow>Formats enabled</Eyebrow><div className="text-2xl font-medium mt-1">{campaign.brief.formats.length}</div></Card>
