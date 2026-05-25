@@ -36,7 +36,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Augen ↔ Figma</h1>
+  <h1>Augen ↔ Figma <span style="color:#6a6a72;font-weight:400;font-size:10px">· v3</span></h1>
   <p class="sub">Pull an Augen creative onto the canvas, edit copy & layout, push it back.</p>
 
   <!-- Not connected -->
@@ -63,6 +63,12 @@
     <summary>Advanced</summary>
     <label>Augen URL</label>
     <input id="base" placeholder="https://web-production-9666a.up.railway.app" />
+    <label style="margin-top:8px">Paste a token (skips Connect — most reliable for localhost)</label>
+    <div style="display:flex;gap:8px">
+      <input id="ptoken" type="password" placeholder="augen_…" style="flex:1" />
+      <button id="usetoken" class="ghost" style="flex:none">Use token</button>
+    </div>
+    <div style="font-size:10px;color:#6a6a72;margin-top:4px">Generate one at <span id="tokurl">your Augen</span> → Settings → MCP &amp; API.</div>
   </details>
 
   <div class="muted"><b>Edit:</b> change the <code>augen:*</code> text layers (and move the headline / CTA) on an imported frame, select it, then <b>Send selection → Augen</b>. The render image is a locked backdrop; copy + layout sync back — re-render in Augen to see it.</div>
@@ -80,9 +86,17 @@
 
   // restore advanced URL override — save on every keystroke/paste, not just blur
   if (ls.get("base")) $("base").value = ls.get("base");
-  const saveBase = () => ls.set("base", $("base").value.trim());
+  const saveBase = () => { ls.set("base", $("base").value.trim()); $("tokurl").textContent = base() + "/settings/mcp"; };
   $("base").addEventListener("input", saveBase);
   $("base").addEventListener("change", saveBase);
+  $("tokurl").textContent = base() + "/settings/mcp";
+
+  // Reliable fallback: paste a token (from /settings/mcp) and skip the connect flow.
+  $("usetoken").onclick = () => {
+    const t = $("ptoken").value.trim();
+    if (!t.startsWith("augen_")) { setStatus("Paste a valid augen_… token.", "err"); return; }
+    ls.set("token", t); $("ptoken").value = ""; render(); setStatus("Token saved ✓ — loading brands…", "ok"); loadBrands();
+  };
 
   let creatives = [];
 
