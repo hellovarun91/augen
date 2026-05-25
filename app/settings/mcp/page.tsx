@@ -49,6 +49,18 @@ export default async function McpPage() {
           AI/image spend and is rate-limited. Tokens are revocable any time above.
         </p>
       </Section>
+
+      <Section title="Figma plugin" subtitle="Edit creatives in Figma and sync them back — uses the same token.">
+        <Card className="p-6 space-y-3 text-sm text-ink-200">
+          <ol className="list-decimal pl-5 space-y-1.5">
+            <li>In Figma (desktop): <b>Plugins → Development → Import plugin from manifest…</b> and pick <code className="text-ink-300">figma-plugin/manifest.json</code> from the repo.</li>
+            <li>Open the plugin. Fill in: <b>Augen URL</b> = <code className="text-ink-300">{endpoint.replace("/api/mcp", "")}</code>, <b>Access token</b> = a token generated above, <b>Brand slug</b> = the part after <code className="text-ink-300">/brands/</code>.</li>
+            <li><b>Load creatives → Import</b> one. Edit the <code className="text-ink-300">augen:*</code> text layers (and move the headline / CTA), select the frame, then <b>Send selection → Augen</b>.</li>
+            <li>Copy <i>and</i> layout (headline position, CTA placement) sync back. Re-render the creative in Augen to see the changes.</li>
+          </ol>
+          <p className="text-[11px] text-ink-500">The render image imports as a locked backdrop; you edit the text layers on top.</p>
+        </Card>
+      </Section>
     </div>
   );
 }

@@ -20,26 +20,26 @@ token sync, lives in the app under **Manage Brand → Design tokens → Figma**)
 
 ## One-time setup
 
-1. **Set a plugin token on the server.** Add an env var on your Augen deploy:
-   ```
-   PLUGIN_API_TOKEN=<a long random string>
-   ```
-   (On Railway: `railway variables --set "PLUGIN_API_TOKEN=…" --service web`.)
-   Without it, the plugin API returns 503 by design.
+1. **Generate a token in Augen.** Open **Settings → MCP & API** and click
+   **Generate token** (the same personal tokens MCP uses). Copy it.
 
 2. **Load the plugin in Figma** (desktop app):
    - Menu → **Plugins → Development → Import plugin from manifest…**
    - Pick `figma-plugin/manifest.json` from this repo.
 
 3. **Open the plugin** and fill in:
-   - **Augen URL** — e.g. `https://web-production-9666a.up.railway.app`
-   - **Plugin token** — the same `PLUGIN_API_TOKEN` value
-   - **Brand slug** — e.g. `tanda`
+   - **Augen URL** — e.g. `https://web-production-9666a.up.railway.app` (pre-filled)
+   - **Access token** — the token you generated in step 1 (`augen_…`)
+   - **Brand slug** — the part after `/brands/` in the brand's URL, e.g. `tanda`
+
+No server env var needed — it works against any Augen deploy as soon as you have a token.
 
 ## Security notes
 
-- The plugin API (`/api/plugin/*`) authenticates with `PLUGIN_API_TOKEN` (sent as the
-  `x-augen-token` header), not your session — so it works from Figma's sandbox.
+- The plugin API (`/api/plugin/*`) authenticates with a **personal token** (the same
+  tokens as MCP, sent as `x-augen-token`), resolves it to your user, and scopes every
+  request to brands you're a member of — so it works from Figma's sandbox and can't
+  touch other people's brands.
 - Before sharing the plugin, narrow `networkAccess.allowedDomains` in `manifest.json`
   from `["*"]` to just your Augen domain.
 

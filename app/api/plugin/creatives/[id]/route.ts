@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { getGeneration, updateGenerationCopy, getGenerationOverrides, updateGenerationOverrides } from "@/lib/repo";
-import { pluginAuthorized, pluginConfigured, pluginJson, pluginPreflight } from "@/lib/plugin";
+import { getGeneration, updateGenerationCopy, getGenerationOverrides, updateGenerationOverrides, hasBrandAccess } from "@/lib/repo";
+import { pluginUser, pluginJson, pluginPreflight } from "@/lib/plugin";
 import { parseOverrides, mergeOverrides } from "@/lib/composer/overrides";
 import { revalidatePath } from "next/cache";
 
@@ -10,15 +10,16 @@ export const dynamic = "force-dynamic";
 
 export function OPTIONS() { return pluginPreflight(); }
 
-// POST /api/plugin/creatives/[id]  { headline, subhead, cta, eyebrow }
-// Writes copy edited in Figma back onto the creative, then returns a fresh render URL.
+// POST /api/plugin/creatives/[id]  { headline, subhead, cta, eyebrow, layout? }
+// Writes copy + layout edited in Figma back onto the creative; returns a fresh render URL.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!pluginConfigured()) return pluginJson({ error: "Plugin API not configured." }, 503);
-  if (!pluginAuthorized(req)) return pluginJson({ error: "Unauthorized" }, 401);
+  const userId = pluginUser(req);
+  if (!userId) return pluginJson({ error: "Unauthorized — generate a token in Augen → Settings → MCP & API." }, 401);
 
   const { id } = await params;
   const gen = getGeneration(id);
   if (!gen) return pluginJson({ error: "Creative not found" }, 404);
+  if (!hasBrandAccess(userId, gen.brand_id)) return pluginJson({ error: "You don't have access to that creative." }, 403);
 
   let body: any;
   try { body = await req.json(); } catch { return pluginJson({ error: "Bad JSON" }, 400); }

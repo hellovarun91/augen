@@ -1,22 +1,23 @@
 import { NextRequest } from "next/server";
-import { getBrandBySlug, listCampaignsByBrand, listGenerationsByCampaign } from "@/lib/repo";
+import { getBrandBySlug, listCampaignsByBrand, listGenerationsByCampaign, hasBrandAccess } from "@/lib/repo";
 import { formatBySlug } from "@/lib/formats";
-import { pluginAuthorized, pluginConfigured, pluginJson, pluginPreflight } from "@/lib/plugin";
+import { pluginUser, pluginJson, pluginPreflight } from "@/lib/plugin";
 
 export const dynamic = "force-dynamic";
 
 export function OPTIONS() { return pluginPreflight(); }
 
-// GET /api/plugin/creatives?brand=<slug>&token=<t>
+// GET /api/plugin/creatives?brand=<slug>  (token via x-augen-token / Bearer)
 // Lists a brand's creatives for the Figma plugin: copy + a render URL per ad.
 export async function GET(req: NextRequest) {
-  if (!pluginConfigured()) return pluginJson({ error: "Plugin API not configured (set PLUGIN_API_TOKEN)." }, 503);
-  if (!pluginAuthorized(req)) return pluginJson({ error: "Unauthorized" }, 401);
+  const userId = pluginUser(req);
+  if (!userId) return pluginJson({ error: "Unauthorized — generate a token in Augen → Settings → MCP & API." }, 401);
 
   const url = new URL(req.url);
   const slug = url.searchParams.get("brand") || "";
   const brand = getBrandBySlug(slug);
-  if (!brand) return pluginJson({ error: "Brand not found" }, 404);
+  if (!brand) return pluginJson({ error: `No brand with slug "${slug}".` }, 404);
+  if (!hasBrandAccess(userId, brand.id)) return pluginJson({ error: "You don't have access to that brand." }, 403);
 
   const origin = `${url.protocol}//${url.host}`;
   const creatives = listCampaignsByBrand(brand.id)

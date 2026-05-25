@@ -1,23 +1,21 @@
 import { NextRequest } from "next/server";
+import { resolveApiToken } from "@/lib/repo";
 
 // CORS for the Figma plugin: its UI iframe makes requests from a null/opaque
 // origin, so we allow any origin and authenticate with a token instead of cookies.
 export const PLUGIN_CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, x-augen-token",
+  "Access-Control-Allow-Headers": "Content-Type, x-augen-token, Authorization",
 };
 
-export function pluginConfigured(): boolean {
-  return !!process.env.PLUGIN_API_TOKEN;
-}
-
-// Accepts the token via `x-augen-token` header or `?token=` query param.
-export function pluginAuthorized(req: NextRequest): boolean {
-  const expected = process.env.PLUGIN_API_TOKEN;
-  if (!expected) return false;
-  const got = req.headers.get("x-augen-token") || new URL(req.url).searchParams.get("token") || "";
-  return got === expected;
+// Resolves the personal token (same tokens as MCP — generated at /settings/mcp)
+// to a user id. Accepted via `x-augen-token`, `Authorization: Bearer`, or `?token=`.
+export function pluginUser(req: NextRequest): string | null {
+  const auth = req.headers.get("authorization") || "";
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  const token = (m ? m[1].trim() : null) || req.headers.get("x-augen-token") || new URL(req.url).searchParams.get("token") || "";
+  return token ? resolveApiToken(token) : null;
 }
 
 export function pluginJson(obj: unknown, status = 200) {

@@ -26,18 +26,33 @@
   .status.ok { color: #34d399; }
   .muted { color: #8a8a92; font-size: 10px; margin-top: 10px; }
   hr { border: 0; border-top: 1px solid #1e1e24; margin: 12px 0; }
+  .hint { color: #6a6a72; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  code { background: #1a1a1f; border-radius: 4px; padding: 1px 4px; font-size: 11px; color: #c7d2fe; }
+  details.help { background: #14141a; border: 1px solid #2a2a32; border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+  details.help summary { cursor: pointer; font-size: 11px; color: #c7d2fe; }
+  details.help ol { margin: 8px 0 2px; padding-left: 18px; color: #b0b0b8; }
+  details.help li { margin: 4px 0; font-size: 11px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Augen ↔ Figma</h1>
-  <p class="sub">Import a creative, edit its copy here, send it back to Augen.</p>
+  <p class="sub">Pull an Augen creative onto the canvas, edit its copy & layout, push it back.</p>
+
+  <details id="setup" class="help">
+    <summary>First time? Setup (3 steps)</summary>
+    <ol>
+      <li>In Augen, open <b>Settings → MCP &amp; API</b> and click <b>Generate token</b>. Copy it.</li>
+      <li>Paste your Augen URL + that token below, and the <b>brand slug</b> (the part after <code>/brands/</code> in the URL).</li>
+      <li><b>Load creatives</b> → <b>Import</b> one → edit the <code>augen:*</code> text layers → select the frame → <b>Send selection → Augen</b>.</li>
+    </ol>
+  </details>
 
   <label>Augen URL</label>
-  <input id="base" placeholder="https://web-production-9666a.up.railway.app" />
-  <label>Plugin token</label>
-  <input id="token" type="password" placeholder="PLUGIN_API_TOKEN" />
-  <label>Brand slug</label>
+  <input id="base" value="https://web-production-9666a.up.railway.app" placeholder="https://your-augen-url" />
+  <label>Access token <span class="hint">— Augen → Settings → MCP &amp; API</span></label>
+  <input id="token" type="password" placeholder="augen_…" />
+  <label>Brand slug <span class="hint">— e.g. tanda (from /brands/tanda)</span></label>
   <input id="slug" placeholder="tanda" />
 
   <div class="bar">
@@ -45,9 +60,9 @@
     <button id="send" class="ghost">Send selection → Augen</button>
   </div>
 
-  <div id="list"></div>
   <div id="status" class="status"></div>
-  <div class="muted">Edit the <b>augen:*</b> text layers on an imported frame, select it, then “Send selection → Augen”. The render is a locked backdrop.</div>
+  <div id="list"></div>
+  <div class="muted"><b>Edit:</b> change the <code>augen:*</code> text layers (and move the headline / CTA) on an imported frame, select it, then <b>Send selection → Augen</b>. The render image is a locked backdrop — copy + layout sync back; re-render in Augen to see it.</div>
 </div>
 
 <script>
