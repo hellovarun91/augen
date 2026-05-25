@@ -1,7 +1,9 @@
 "use server";
-import { updateBrandFields } from "@/lib/repo";
+import { updateBrandFields, deleteBrand, brandRole } from "@/lib/repo";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireBrandAccess } from "@/lib/authz";
+import { setActiveBrand } from "@/lib/session";
 
 export async function saveIdentityAction(
   brandId: string,
@@ -17,4 +19,14 @@ export async function saveIdentityAction(
   // Slug is intentionally stable on rename so existing links never break.
   revalidatePath("/brands/[slug]", "page");
   revalidatePath("/");
+}
+
+// Permanently delete a brand and everything under it. Owner-only.
+export async function deleteBrandAction(brandId: string) {
+  const user = await requireBrandAccess(brandId);
+  if (brandRole(user.id, brandId) !== "owner") throw new Error("Only the brand owner can delete it.");
+  deleteBrand(brandId);
+  try { await setActiveBrand(null as any); } catch { /* best effort */ }
+  revalidatePath("/");
+  redirect("/");
 }

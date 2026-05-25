@@ -1,9 +1,11 @@
 import { Eyebrow } from "@/components/ui/primitives";
-import { getBrandBySlug } from "@/lib/repo";
+import { getBrandBySlug, brandRole } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
 import { IdentityEditor } from "./form";
+import { DeleteBrand } from "./danger";
+import { getSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,8 @@ export default async function IdentityPage({ params }: { params: Promise<{ slug:
   const { slug } = await params;
   const brand = getBrandBySlug(slug);
   if (!brand) notFound();
+  const { user } = await getSession();
+  const isOwner = !!user && brandRole(user.id, brand.id) === "owner";
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-3xl mx-auto space-y-8">
@@ -25,6 +29,8 @@ export default async function IdentityPage({ params }: { params: Promise<{ slug:
         id: brand.id, name: brand.name, tagline: brand.tagline || "",
         industry: brand.industry || "", description: brand.description || "",
       }} />
+
+      {isOwner && <DeleteBrand brandId={brand.id} name={brand.name} />}
     </div>
   );
 }

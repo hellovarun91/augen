@@ -11,6 +11,7 @@ import {
   listExternalWinners, createExternalWinner,
   getProjectCopySchema, listCopyRows, getCopyRow, updateCopyRow, linkCopyRow,
   listComments, createComment, listReviews, recordVisionReview,
+  brandRole, deleteBrand,
 } from "@/lib/repo";
 import { addMembership, listMembershipsForBrand, getUserByEmail, createUser, pickAvatarColor } from "@/lib/users";
 import { addAllowedEmail } from "@/lib/authz";
@@ -43,6 +44,7 @@ export const TOOL_DEFS: McpTool[] = [
   { name: "get_brand", description: "Brand detail: identity, voice, palette, and a foundation-strength score with the gaps to fix.", inputSchema: { type: "object", properties: { brand: s("Brand slug.") }, required: ["brand"] } },
   { name: "create_brand", description: "Create a brand from a one-paragraph brief (AI synthesizes the full identity).", inputSchema: { type: "object", properties: { brief: s("A paragraph describing the brand."), name: s("Optional name override.") }, required: ["brief"] } },
   { name: "refine_brand", description: "Refine a brand's design system in plain language (e.g. 'warmer palette, bolder voice'). Applies immediately.", inputSchema: { type: "object", properties: { brand: s("Brand slug."), instruction: s("What to change.") }, required: ["brand", "instruction"] } },
+  { name: "delete_brand", description: "Permanently delete a brand and everything under it (projects, creatives, assets, references). Owner-only. Irreversible.", inputSchema: { type: "object", properties: { brand: s("Brand slug.") }, required: ["brand"] } },
 
   // ---- Projects ----
   { name: "list_projects", description: "List a brand's projects.", inputSchema: { type: "object", properties: { brand: s("Brand slug.") }, required: ["brand"] } },
@@ -178,6 +180,12 @@ export async function callTool(userId: string, name: string, args: Record<string
       const r = await refineBrandAI(b, instruction);
       updateBrandTokens(b.id, r.tokens);
       return text(`${r.summary} (${r.viaAI ? "AI" : "heuristic"})`);
+    }
+    case "delete_brand": {
+      const b = await brandFromSlug(userId, String(args.brand));
+      if (brandRole(userId, b.id) !== "owner") throw new Error("Only the brand owner can delete it.");
+      deleteBrand(b.id);
+      return text(`Deleted "${b.name}" (${b.slug}) and everything under it.`);
     }
 
     // ---------- Projects ----------

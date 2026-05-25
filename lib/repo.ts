@@ -379,6 +379,23 @@ export function hasBrandAccess(userId: string, brandId: string): boolean {
   return !!m;
 }
 
+// The user's role on a brand (owner | editor | manager | …), or null if not a member.
+export function brandRole(userId: string, brandId: string): string | null {
+  const r = db().prepare("SELECT role FROM memberships WHERE user_id = ? AND brand_id = ? LIMIT 1").get(userId, brandId) as { role: string } | undefined;
+  return r?.role || null;
+}
+
+// Delete a brand and everything under it. Most child tables cascade via FK
+// (campaigns→generations/ideas, references, assets, winners, copy_rows,
+// figma_webhooks…); the rest (memberships, comments, spend) are cleared here.
+export function deleteBrand(id: string) {
+  const d = db();
+  for (const t of ["memberships", "comments", "api_spend"]) {
+    try { d.prepare(`DELETE FROM ${t} WHERE brand_id = ?`).run(id); } catch { /* table/col may not exist */ }
+  }
+  d.prepare("DELETE FROM brands WHERE id = ?").run(id);
+}
+
 // ---------- Figma live-sync webhooks ----------
 export interface FigmaWebhookRow {
   brand_id: string; team_id: string; file_key: string; webhook_id: string;
