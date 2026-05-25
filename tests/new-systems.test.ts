@@ -178,6 +178,19 @@ describe("vision QC critic (heuristic fallback)", () => {
   });
 });
 
+describe("figma token merge (live sync)", () => {
+  it("overwrites only the keys Figma provided", async () => {
+    const { mergeTokens } = await import("@/lib/figma/sync");
+    const brand = fakeBrand();
+    const merged = mergeTokens(brand.tokens, { palette: { primary: "#ffffff" } as any, fonts: { display: "Custom Serif" } as any });
+    expect(merged.palette.primary).toBe("#ffffff");           // changed
+    expect(merged.palette.background).toBe(brand.tokens.palette.background); // untouched
+    expect(merged.fonts.display).toBe("Custom Serif");        // changed
+    expect(merged.fonts.body).toBe(brand.tokens.fonts.body);  // untouched
+    expect(merged.scrim).toEqual(brand.tokens.scrim);         // whole group untouched
+  });
+});
+
 describe("url ingest (M-C)", () => {
   it("blocks internal and malformed URLs without network", async () => {
     const { fetchSiteText } = await import("@/lib/ingest/url");

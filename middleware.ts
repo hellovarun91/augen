@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC = ["/signin", "/api/render", "/api/preview.svg", "/_next", "/favicon", "/api/active-brand"];
+// These bypass the session gate: render/preview are public assets; the Figma
+// webhook and plugin API authenticate themselves (passcode / plugin token).
+const PUBLIC = ["/signin", "/api/render", "/api/preview.svg", "/_next", "/favicon", "/api/active-brand", "/api/figma/webhook", "/api/plugin"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

@@ -258,6 +258,24 @@ function migrate(d: Database.Database) {
   // Vision QC critic: design score (0-1) + notes from inspecting the rendered pixels
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_score REAL").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_notes TEXT").run(); } catch {}
+
+  // Figma live-sync webhooks: one per brand, keyed to a team + file. Figma POSTs
+  // our endpoint on FILE_UPDATE and we auto-pull Variables into the brand tokens.
+  d.exec(`
+  CREATE TABLE IF NOT EXISTS figma_webhooks (
+    brand_id TEXT PRIMARY KEY REFERENCES brands(id) ON DELETE CASCADE,
+    team_id TEXT NOT NULL,
+    file_key TEXT NOT NULL,
+    webhook_id TEXT NOT NULL,
+    passcode TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    last_event_at INTEGER,
+    last_status TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS figma_webhooks_wh_idx ON figma_webhooks(webhook_id);
+  `);
   // Detailed usage tracking columns on agent_runs (additive — older rows have nulls)
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_create_tokens INTEGER").run(); } catch {}
   try { d.prepare("ALTER TABLE agent_runs ADD COLUMN cache_read_tokens INTEGER").run(); } catch {}

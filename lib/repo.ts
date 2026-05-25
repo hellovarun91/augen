@@ -299,6 +299,34 @@ export function updateGenerationStatus(id: string, status: string, note?: string
   );
 }
 
+// ---------- Figma live-sync webhooks ----------
+export interface FigmaWebhookRow {
+  brand_id: string; team_id: string; file_key: string; webhook_id: string;
+  passcode: string; endpoint: string; active: number;
+  last_event_at: number | null; last_status: string | null; created_at: number;
+}
+
+export function getFigmaWebhookByBrand(brandId: string): FigmaWebhookRow | null {
+  return (db().prepare("SELECT * FROM figma_webhooks WHERE brand_id = ?").get(brandId) as FigmaWebhookRow) || null;
+}
+export function getFigmaWebhookByWebhookId(webhookId: string): FigmaWebhookRow | null {
+  return (db().prepare("SELECT * FROM figma_webhooks WHERE webhook_id = ?").get(webhookId) as FigmaWebhookRow) || null;
+}
+export function upsertFigmaWebhook(row: Omit<FigmaWebhookRow, "last_event_at" | "last_status" | "created_at">) {
+  db().prepare(`
+    INSERT INTO figma_webhooks (brand_id, team_id, file_key, webhook_id, passcode, endpoint, active, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(brand_id) DO UPDATE SET team_id = excluded.team_id, file_key = excluded.file_key,
+      webhook_id = excluded.webhook_id, passcode = excluded.passcode, endpoint = excluded.endpoint, active = excluded.active
+  `).run(row.brand_id, row.team_id, row.file_key, row.webhook_id, row.passcode, row.endpoint, row.active, nowMs());
+}
+export function setFigmaWebhookEvent(webhookId: string, status: string) {
+  db().prepare("UPDATE figma_webhooks SET last_event_at = ?, last_status = ? WHERE webhook_id = ?").run(nowMs(), status, webhookId);
+}
+export function deleteFigmaWebhook(brandId: string) {
+  db().prepare("DELETE FROM figma_webhooks WHERE brand_id = ?").run(brandId);
+}
+
 // Persist a Vision QC critique: store the design score + notes on the generation,
 // and log a review row attributed to "vision-critic" so it shows in the timeline.
 export function recordVisionReview(generationId: string, input: { score: number; verdict: string; notes: string[]; fixes?: string[] }) {

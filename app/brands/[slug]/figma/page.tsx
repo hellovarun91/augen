@@ -1,7 +1,8 @@
 import { Badge, Card, Eyebrow, Section } from "@/components/ui/primitives";
-import { getBrandBySlug, getBrandFigmaUrl } from "@/lib/repo";
+import { getBrandBySlug, getBrandFigmaUrl, getFigmaWebhookByBrand } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import { FigmaSyncForm } from "./form";
+import { FigmaLiveSync } from "./live-sync";
 import { figmaStatus } from "@/lib/images/providers";
 import { TokenSubNav } from "@/components/token-subnav";
 
@@ -13,6 +14,7 @@ export default async function FigmaPage({ params }: { params: Promise<{ slug: st
   if (!brand) notFound();
   const fileUrl = getBrandFigmaUrl(brand.id) || "";
   const status = figmaStatus();
+  const hook = getFigmaWebhookByBrand(brand.id);
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-5xl mx-auto space-y-10">
@@ -36,6 +38,15 @@ export default async function FigmaPage({ params }: { params: Promise<{ slug: st
           fileUrl={fileUrl}
           currentTokens={brand.tokens}
           disabled={!status.enabled}
+        />
+      </Card>
+
+      <Card className="p-6">
+        <FigmaLiveSync
+          brandId={brand.id}
+          slug={brand.slug}
+          fileSet={!!fileUrl}
+          hook={hook ? { team_id: hook.team_id, file_key: hook.file_key, active: hook.active, last_event_at: hook.last_event_at, last_status: hook.last_status } : null}
         />
       </Card>
 

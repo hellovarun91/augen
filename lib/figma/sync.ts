@@ -220,6 +220,46 @@ export async function pushVariables(fileUrlOrKey: string, tokens: BrandTokens): 
   return { created, updated, collection: collection.name };
 }
 
+// ---------- Live sync (webhooks v2) ----------
+
+export interface RegisteredWebhook { id: string; teamId: string; endpoint: string }
+
+// Create a FILE_UPDATE webhook for a team. Figma will POST `endpoint` (and echo
+// `passcode` in every event) when any file in the team changes.
+export async function registerWebhook(teamId: string, endpoint: string, passcode: string, description = "Augen live token sync"): Promise<RegisteredWebhook> {
+  const token = figmaToken();
+  if (!token) throw new Error("FIGMA_PERSONAL_ACCESS_TOKEN not set");
+  if (!/^https:\/\//.test(endpoint)) throw new Error("Figma webhooks require a public HTTPS endpoint (deploy first, or use a tunnel).");
+  const r = await fetch(`${FIGMA_BASE.replace("/v1", "")}/v2/webhooks`, {
+    method: "POST",
+    headers: { "X-FIGMA-TOKEN": token, "Content-Type": "application/json" },
+    body: JSON.stringify({ event_type: "FILE_UPDATE", team_id: teamId, endpoint, passcode, description }),
+  });
+  if (!r.ok) throw new Error(`Figma webhook create failed: ${r.status} ${(await r.text()).slice(0, 200)}`);
+  const j: any = await r.json();
+  return { id: String(j.id), teamId, endpoint };
+}
+
+export async function deleteWebhookRemote(webhookId: string): Promise<void> {
+  const token = figmaToken();
+  if (!token) return;
+  await fetch(`${FIGMA_BASE.replace("/v1", "")}/v2/webhooks/${webhookId}`, { method: "DELETE", headers: { "X-FIGMA-TOKEN": token } });
+}
+
+// Merge a pulled token subset onto the brand's current tokens (only overwrite the
+// keys Figma actually provided). Returns a full token object ready to persist.
+export function mergeTokens(current: BrandTokens, partial: Partial<BrandTokens>): BrandTokens {
+  return {
+    ...current,
+    palette: { ...current.palette, ...(partial.palette || {}) },
+    fonts: { ...current.fonts, ...(partial.fonts || {}) },
+    type: { ...current.type, ...(partial.type || {}) },
+    scrim: { ...current.scrim, ...(partial.scrim || {}) },
+    locker: { ...current.locker, ...(partial.locker || {}) },
+    imagery: { ...current.imagery, ...(partial.imagery || {}) },
+  };
+}
+
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const clean = hex.replace("#", "");
   const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean;
