@@ -74,17 +74,43 @@ function findAugenFrame() {
   return null;
 }
 
+// CTA centre → the nearest Augen layout preset.
+function ctaPositionFrom(cx, cy) {
+  if (cy < 0.45 && cx > 0.5) return "top-right";
+  if (cy >= 0.55 && cx > 0.55) return "bottom-right";
+  if (cy >= 0.55 && cx <= 0.45) return "bottom-left";
+  if (cx > 0.5) return "inline-right";
+  return "auto";
+}
+
 function readSelection() {
   const frame = findAugenFrame();
   if (!frame) { figma.ui.postMessage({ type: "error", message: "Select an imported Augen frame (or a layer inside it) first." }); return; }
   const id = frame.getPluginData("augenId");
+  const W = frame.width, H = frame.height;
   const copy = {};
+  const nodes = {};
   for (const child of frame.children) {
     if (child.type === "TEXT" && child.name.indexOf("augen:") === 0) {
-      copy[child.name.slice("augen:".length)] = child.characters;
+      const key = child.name.slice("augen:".length);
+      copy[key] = child.characters;
+      nodes[key] = child;
     }
   }
-  figma.ui.postMessage({ type: "selection-copy", id: id, copy: copy });
+
+  // Layout round-trip: map moved positions back onto Augen overrides.
+  const layout = {};
+  if (nodes.headline) {
+    // headline was imported at y = 0.56*H; report the delta as a fraction of height.
+    layout.headlineYShift = Math.max(-0.3, Math.min(0.3, (nodes.headline.y / H) - 0.56));
+  }
+  if (nodes.cta) {
+    const cx = (nodes.cta.x + nodes.cta.width / 2) / W;
+    const cy = (nodes.cta.y + nodes.cta.height / 2) / H;
+    layout.ctaPosition = ctaPositionFrom(cx, cy);
+  }
+
+  figma.ui.postMessage({ type: "selection-copy", id: id, copy: copy, layout: layout });
 }
 
 figma.ui.onmessage = async (msg) => {

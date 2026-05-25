@@ -13,8 +13,10 @@ token sync, lives in the app under **Manage Brand → Design tokens → Figma**)
 - Edit the copy in Figma, select the frame, **Send selection → Augen**. Augen
   updates that creative's copy; re-render in Augen to see it.
 
-> v1 round-trips **copy**. Layout/positions stay in Figma for now — the reliable,
-> high-value loop first. Pushing positions back (→ Augen overrides) is the next step.
+> Round-trips **copy + layout**. Editing the `augen:*` text and **moving** them is
+> picked up: the headline's vertical position maps to the `headlineYShift` override,
+> and the CTA's position maps to the nearest CTA placement preset. Finer layout
+> (per-element free positioning) still lives in Figma.
 
 ## One-time setup
 

@@ -121,11 +121,11 @@
         const res = await fetch(base + "/api/plugin/creatives/" + msg.id, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-augen-token": token },
-          body: JSON.stringify(msg.copy),
+          body: JSON.stringify(Object.assign({}, msg.copy, { layout: msg.layout })),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
-        setStatus("Saved to Augen ✓ — re-render to see it.", "ok");
+        setStatus("Saved copy + layout to Augen ✓ — re-render to see it.", "ok");
       } catch (e) { setStatus("Save failed: " + (e.message || ""), "err"); }
     }
   };
