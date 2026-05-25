@@ -255,6 +255,11 @@ function migrate(d: Database.Database) {
   try { d.prepare("ALTER TABLE campaigns ADD COLUMN signed_off_at INTEGER").run(); } catch {}
   // Copy Sheet row <-> creative link (CS3): a row can drive a specific generation's copy
   try { d.prepare("ALTER TABLE copy_rows ADD COLUMN generation_id TEXT").run(); } catch {}
+  // Journey re-model (#46): a copy row is a named copy variation; the name labels the
+  // row and names the designs it fans out to. The project's size set (format slugs)
+  // is the set of formats every row renders in.
+  try { d.prepare("ALTER TABLE copy_rows ADD COLUMN name TEXT").run(); } catch {}
+  try { d.prepare("ALTER TABLE campaigns ADD COLUMN sizes_json TEXT").run(); } catch {}
   // Vision QC critic: design score (0-1) + notes from inspecting the rendered pixels
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_score REAL").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_notes TEXT").run(); } catch {}

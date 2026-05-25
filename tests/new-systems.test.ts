@@ -56,26 +56,29 @@ describe("copy mapping (CS3)", () => {
   });
 });
 
-describe("per-region cells (#33)", () => {
-  it("regionCellKey encodes column + region", async () => {
-    const { regionCellKey } = await import("@/lib/copy-schema");
-    expect(regionCellKey("headline", "India")).toBe("headline::India");
+describe("Copy Sheet re-model (#46)", () => {
+  it("rowToLayerCopy reads layer columns by bare key (regions retired)", async () => {
+    const { rowToLayerCopy } = await import("@/lib/copy-schema");
+    const schema = { columns: [{ key: "headline", label: "Headline", role: "headline", layer: "headline", perRegion: false }], regions: [] } as any;
+    expect(rowToLayerCopy(schema, { headline: "Hello" }).headline).toBe("Hello");
   });
 
-  it("rowToLayerCopy reads a per-region column by region (and defaults to the first)", async () => {
-    const { rowToLayerCopy, regionCellKey } = await import("@/lib/copy-schema");
-    const schema = { columns: [{ key: "headline", label: "Headline", role: "headline", layer: "headline", perRegion: true }], regions: ["India", "US"] } as any;
-    const values = { [regionCellKey("headline", "India")]: "नमस्ते", [regionCellKey("headline", "US")]: "Hello" };
-    expect(rowToLayerCopy(schema, values, "US").headline).toBe("Hello");
-    expect(rowToLayerCopy(schema, values).headline).toBe("नमस्ते"); // defaults to first region
+  it("layerCopyToRowValues writes layer columns by bare key and preserves other cells", async () => {
+    const { layerCopyToRowValues } = await import("@/lib/copy-schema");
+    const schema = { columns: [
+      { key: "headline", label: "Headline", role: "headline", layer: "headline", perRegion: false },
+      { key: "offer", label: "Offer", role: "offer", layer: "none", perRegion: false },
+    ], regions: [] } as any;
+    const next = layerCopyToRowValues(schema, { offer: "20% off" }, { headline: "Bonjour", subhead: "", cta: "", eyebrow: "" });
+    expect(next.headline).toBe("Bonjour");
+    expect(next.offer).toBe("20% off"); // non-layer column preserved
   });
 
-  it("layerCopyToRowValues writes to the region-suffixed key for per-region columns", async () => {
-    const { layerCopyToRowValues, regionCellKey } = await import("@/lib/copy-schema");
-    const schema = { columns: [{ key: "headline", label: "Headline", role: "headline", layer: "headline", perRegion: true }], regions: ["India", "US"] } as any;
-    const next = layerCopyToRowValues(schema, {}, { headline: "Bonjour", subhead: "", cta: "", eyebrow: "" }, "US");
-    expect(next[regionCellKey("headline", "US")]).toBe("Bonjour");
-    expect(next.headline).toBeUndefined(); // bare key not used for per-region
+  it("the project's default size set is the four canonical aspects (1:1, 4:5, 9:16, 16:9)", async () => {
+    const { defaultProjectSizes, aspectForSlug } = await import("@/lib/formats");
+    const sizes = defaultProjectSizes();
+    expect(sizes.length).toBe(4);
+    expect(sizes.map(aspectForSlug)).toEqual(["1:1", "4:5", "9:16", "16:9"]);
   });
 });
 

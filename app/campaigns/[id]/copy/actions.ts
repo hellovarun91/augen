@@ -2,6 +2,7 @@
 import {
   getCampaign, createCopyRow, updateCopyRow, deleteCopyRow, setProjectCopySchema,
   getCopyRow, linkCopyRow, getProjectCopySchema, getGeneration, updateGenerationCopy,
+  setProjectSizes,
 } from "@/lib/repo";
 import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
 import { requireCampaignAccess } from "@/lib/authz";
@@ -14,11 +15,11 @@ function rowInProject(campaignId: string, rowId: string) {
   return row;
 }
 
-export async function addRowAction(campaignId: string) {
+export async function addRowAction(campaignId: string, name = "") {
   await requireCampaignAccess(campaignId);
   const c = getCampaign(campaignId);
   if (!c) throw new Error("Project missing");
-  const row = createCopyRow(campaignId, c.brand_id, {});
+  const row = createCopyRow(campaignId, c.brand_id, {}, name.trim());
   revalidatePath(`/campaigns/${campaignId}/copy`);
   return row.id;
 }
@@ -26,6 +27,22 @@ export async function addRowAction(campaignId: string) {
 export async function updateRowAction(campaignId: string, rowId: string, values: Record<string, string>) {
   await requireCampaignAccess(campaignId);
   updateCopyRow(rowId, { values });
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+}
+
+// The Name column: labels the variation and names the designs it fans out to (#46).
+export async function setRowNameAction(campaignId: string, rowId: string, name: string) {
+  await requireCampaignAccess(campaignId);
+  rowInProject(campaignId, rowId);
+  updateCopyRow(rowId, { name: name.trim().slice(0, 80) });
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+}
+
+// The project size set: the formats every row fans out to (#46).
+export async function saveSizesAction(campaignId: string, slugs: string[]) {
+  await requireCampaignAccess(campaignId);
+  if (!Array.isArray(slugs) || slugs.length === 0) throw new Error("Pick at least one size.");
+  setProjectSizes(campaignId, slugs);
   revalidatePath(`/campaigns/${campaignId}/copy`);
 }
 

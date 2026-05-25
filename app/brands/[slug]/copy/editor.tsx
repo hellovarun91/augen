@@ -9,8 +9,6 @@ const LAYERS: CopyColumn["layer"][] = ["headline", "subhead", "cta", "eyebrow", 
 
 export function CopySchemaEditor({ brandId, slug, initial }: { brandId: string; slug: string; initial: CopySchema }) {
   const [columns, setColumns] = useState<CopyColumn[]>(initial.columns);
-  const [regions, setRegions] = useState<string[]>(initial.regions);
-  const [regionDraft, setRegionDraft] = useState("");
   const [doc, setDoc] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +32,6 @@ export function CopySchemaEditor({ brandId, slug, initial }: { brandId: string; 
       try {
         const r = await inferSchemaAction(brandId, doc);
         setColumns(r.schema.columns);
-        setRegions(r.schema.regions);
         setNote(`${r.provider === "claude" ? "Claude read your doc" : "Parsed your doc"} — ${r.rationale} Review and save.`);
       } catch (e: any) { setError(e?.message || "Could not read the doc"); }
     });
@@ -43,7 +40,7 @@ export function CopySchemaEditor({ brandId, slug, initial }: { brandId: string; 
     setError(null);
     start(async () => {
       try {
-        await saveSchemaAction(brandId, slug, { columns, regions });
+        await saveSchemaAction(brandId, slug, { columns, regions: [] });
         setSaved(true); setTimeout(() => setSaved(false), 2000);
       } catch (e: any) { setError(e?.message || "Save failed"); }
     });
@@ -70,16 +67,13 @@ export function CopySchemaEditor({ brandId, slug, initial }: { brandId: string; 
           {columns.map((col, i) => (
             <div key={i} className="grid grid-cols-12 gap-2 items-center rounded-lg ring-1 ring-white/10 p-2">
               <Input className="col-span-3 text-sm" value={col.label} onChange={(e) => patchCol(i, { label: e.target.value })} placeholder="Label" />
-              <select className="col-span-2 rounded-lg bg-ink-800 px-2 py-2 text-xs ring-1 ring-inset ring-white/10" value={col.role} onChange={(e) => patchCol(i, { role: e.target.value as any })}>
+              <select className="col-span-3 rounded-lg bg-ink-800 px-2 py-2 text-xs ring-1 ring-inset ring-white/10" value={col.role} onChange={(e) => patchCol(i, { role: e.target.value as any })}>
                 {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
-              <select className="col-span-2 rounded-lg bg-ink-800 px-2 py-2 text-xs ring-1 ring-inset ring-white/10" value={col.layer} onChange={(e) => patchCol(i, { layer: e.target.value as any })} title="Which on-creative slot this feeds">
+              <select className="col-span-3 rounded-lg bg-ink-800 px-2 py-2 text-xs ring-1 ring-inset ring-white/10" value={col.layer} onChange={(e) => patchCol(i, { layer: e.target.value as any })} title="Which on-creative slot this feeds">
                 {LAYERS.map((l) => <option key={l} value={l}>{l === "none" ? "no layer" : l}</option>)}
               </select>
               <Input className="col-span-2 text-sm" type="number" value={col.maxChars ?? ""} onChange={(e) => patchCol(i, { maxChars: e.target.value ? parseInt(e.target.value, 10) : undefined })} placeholder="max" />
-              <label className="col-span-2 flex items-center gap-1.5 text-[11px] text-ink-300">
-                <input type="checkbox" checked={col.perRegion} onChange={(e) => patchCol(i, { perRegion: e.target.checked })} /> per region
-              </label>
               <div className="col-span-1 flex items-center justify-end gap-1 text-ink-500">
                 <button onClick={() => move(i, -1)} className="hover:text-ink-100" title="Up">↑</button>
                 <button onClick={() => move(i, 1)} className="hover:text-ink-100" title="Down">↓</button>
@@ -88,21 +82,6 @@ export function CopySchemaEditor({ brandId, slug, initial }: { brandId: string; 
             </div>
           ))}
           {columns.length === 0 && <div className="text-xs text-ink-500">No columns yet — import a doc or add one.</div>}
-        </div>
-      </Card>
-
-      <Card className="p-6 space-y-3">
-        <Eyebrow>Regions <span className="text-ink-500">(optional)</span></Eyebrow>
-        <div className="text-xs text-ink-400">Markets you localize copy for. Columns marked “per region” get a value per region in the sheet.</div>
-        <div className="flex flex-wrap items-center gap-1.5 rounded-lg ring-1 ring-white/10 bg-ink-900/40 px-2 py-1.5">
-          {regions.map((r, i) => (
-            <span key={i} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 ring-white/10 bg-white/5">
-              {r}<button onClick={() => setRegions(regions.filter((_, j) => j !== i))} className="text-ink-400 hover:text-white">×</button>
-            </span>
-          ))}
-          <input value={regionDraft} onChange={(e) => setRegionDraft(e.target.value)}
-            onKeyDown={(e) => { if ((e.key === "Enter" || e.key === ",") && regionDraft.trim()) { e.preventDefault(); setRegions([...regions, regionDraft.trim()]); setRegionDraft(""); } }}
-            placeholder={regions.length ? "Add…" : "e.g. US, India, UK"} className="flex-1 min-w-[90px] bg-transparent text-sm px-1 py-0.5 outline-none placeholder:text-ink-500" />
         </div>
       </Card>
 

@@ -1,6 +1,6 @@
 import { Eyebrow } from "@/components/ui/primitives";
-import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign, listGenerationsByCampaign } from "@/lib/repo";
-import { formatBySlug } from "@/lib/formats";
+import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign, listGenerationsByCampaign, getProjectSizes } from "@/lib/repo";
+import { formatBySlug, sizeOptions } from "@/lib/formats";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
@@ -16,6 +16,7 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
   if (!brand) notFound();
   const schema = getProjectCopySchema(campaign.id);
   const rows = syncCopyRowsForCampaign(campaign.id);
+  const sizes = getProjectSizes(campaign.id);
   const generations = listGenerationsByCampaign(campaign.id).map((g) => {
     const f = formatBySlug(g.format_slug);
     const hl = (g.headline || "").replace(/\s+/g, " ").trim().slice(0, 28);
@@ -30,14 +31,14 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
           <Link href={`/campaigns/${campaign.id}`} className="text-xs text-ink-400 hover:text-ink-100">← {campaign.name}</Link>
           <h1 className="serif text-display-lg mt-2 tracking-tight">Copy Sheet</h1>
           <p className="text-ink-300 mt-2 max-w-2xl">
-            One source of truth for this project's copy. Each row is a creative's copy; columns are the brand's copy fields.
-            Write and proof here — designs will read from these rows, and edits stay in sync.
+            The source of truth for this project's copy. Each <span className="text-ink-100">row is a variation</span> (give it a name);
+            each <span className="text-ink-100">column is a layer</span> of the artwork. A row renders in every size you pick — same copy, every format.
           </p>
         </div>
         <Link href={`/brands/${brand.slug}/copy`} className="text-xs text-ink-300 hover:text-white whitespace-nowrap">Edit brand default columns →</Link>
       </div>
 
-      <CopySheet campaignId={campaign.id} slug={brand.slug} schema={schema} initialRows={rows} generations={generations} />
+      <CopySheet campaignId={campaign.id} slug={brand.slug} schema={schema} initialRows={rows} generations={generations} sizes={sizes} sizeOptions={sizeOptions()} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { createHash, randomBytes } from "crypto";
 import { BrandLanguage, BrandTokens, type Brand, type BrandRow, type Campaign, type CampaignRow, type CampaignBrief, type Generation, type GenerationRow, type Idea, type IdeaRow } from "./types";
 import { parseCopySchema, defaultCopySchema, layerCopyToRowValues, type CopySchema } from "./copy-schema";
+import { defaultProjectSizes } from "./formats";
 
 export function listBrands(): Brand[] {
   const rows = db().prepare("SELECT * FROM brands ORDER BY created_at DESC").all() as BrandRow[];
@@ -638,36 +639,53 @@ export function setProjectCopySchema(campaignId: string, schema: CopySchema) {
   db().prepare("UPDATE campaigns SET copy_schema = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(schema), nowMs(), campaignId);
 }
 
+// ---------- Project size set (#46) ----------
+// The formats every copy row fans out to. Defaults to the four canonical aspects
+// (1:1, 4:5, 9:16, 16:9) until the project picks its own.
+export function getProjectSizes(campaignId: string): string[] {
+  const row = db().prepare("SELECT sizes_json FROM campaigns WHERE id = ?").get(campaignId) as { sizes_json: string | null } | undefined;
+  if (!row?.sizes_json) return defaultProjectSizes();
+  try { const arr = JSON.parse(row.sizes_json); return Array.isArray(arr) && arr.length ? arr.filter((s) => typeof s === "string") : defaultProjectSizes(); }
+  catch { return defaultProjectSizes(); }
+}
+
+export function setProjectSizes(campaignId: string, slugs: string[]) {
+  const clean = Array.from(new Set(slugs.filter((s) => typeof s === "string" && s)));
+  db().prepare("UPDATE campaigns SET sizes_json = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(clean), nowMs(), campaignId);
+}
+
 // ---------- Copy Sheet rows ----------
 
 export interface CopyRow {
   id: string; campaign_id: string; brand_id: string;
+  name: string;
   values: Record<string, string>; status: string; order_idx: number; created_at: number;
   generation_id: string | null;
 }
 
 function hydrateCopyRow(r: any): CopyRow {
-  return { ...r, values: r.values_json ? JSON.parse(r.values_json) : {}, generation_id: r.generation_id ?? null };
+  return { ...r, name: r.name ?? "", values: r.values_json ? JSON.parse(r.values_json) : {}, generation_id: r.generation_id ?? null };
 }
 
 export function listCopyRows(campaignId: string): CopyRow[] {
   return (db().prepare("SELECT * FROM copy_rows WHERE campaign_id = ? ORDER BY order_idx ASC, created_at ASC").all(campaignId) as any[]).map(hydrateCopyRow);
 }
 
-export function createCopyRow(campaignId: string, brandId: string, values: Record<string, string> = {}): CopyRow {
+export function createCopyRow(campaignId: string, brandId: string, values: Record<string, string> = {}, name = ""): CopyRow {
   const id = `crow_${nanoid(10)}`;
   const max = db().prepare("SELECT COALESCE(MAX(order_idx), -1) m FROM copy_rows WHERE campaign_id = ?").get(campaignId) as { m: number };
-  db().prepare("INSERT INTO copy_rows (id, campaign_id, brand_id, values_json, status, order_idx, created_at) VALUES (?, ?, ?, ?, 'draft', ?, ?)")
-    .run(id, campaignId, brandId, JSON.stringify(values), max.m + 1, nowMs());
+  db().prepare("INSERT INTO copy_rows (id, campaign_id, brand_id, name, values_json, status, order_idx, created_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)")
+    .run(id, campaignId, brandId, name, JSON.stringify(values), max.m + 1, nowMs());
   return hydrateCopyRow(db().prepare("SELECT * FROM copy_rows WHERE id = ?").get(id));
 }
 
-export function updateCopyRow(id: string, patch: { values?: Record<string, string>; status?: string }) {
+export function updateCopyRow(id: string, patch: { values?: Record<string, string>; status?: string; name?: string }) {
   const cur = db().prepare("SELECT * FROM copy_rows WHERE id = ?").get(id) as any;
   if (!cur) return;
   const values = patch.values ? JSON.stringify(patch.values) : cur.values_json;
   const status = patch.status ?? cur.status;
-  db().prepare("UPDATE copy_rows SET values_json = ?, status = ? WHERE id = ?").run(values, status, id);
+  const name = patch.name ?? cur.name ?? "";
+  db().prepare("UPDATE copy_rows SET values_json = ?, status = ?, name = ? WHERE id = ?").run(values, status, name, id);
 }
 
 export function deleteCopyRow(id: string) {
@@ -688,7 +706,8 @@ export function syncCopyRowsForCampaign(campaignId: string): CopyRow[] {
   for (const g of gens) {
     if (linked.has(g.id)) continue;
     const values = layerCopyToRowValues(schema, {}, { headline: g.headline || "", subhead: g.subhead || "", cta: g.cta || "", eyebrow: g.eyebrow || "" });
-    const row = createCopyRow(campaignId, camp.brand_id, values);
+    const name = (g.headline || "").replace(/\s+/g, " ").trim().slice(0, 40) || g.format_slug || "Variation";
+    const row = createCopyRow(campaignId, camp.brand_id, values, name);
     linkCopyRow(row.id, g.id);
     created = true;
   }

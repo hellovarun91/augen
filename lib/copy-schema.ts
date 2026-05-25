@@ -111,46 +111,28 @@ export function parseSchemaFromDoc(text: string): CopySchema {
   return { columns: cols.slice(0, 16), regions: Array.from(regions).slice(0, 8) };
 }
 
-// ---------- Row <-> creative mapping (CS3) ----------
-// The composer renders four copy layers. These helpers translate between a
-// sheet row's free-form cells and those layers via each column's `layer`.
+// ---------- Row <-> creative mapping ----------
+// The composer renders four copy layers. These helpers translate between a sheet
+// row's cells and those layers via each column's `layer`. Cells are keyed by the
+// bare column key — regions are rows now (#46), not per-cell variants.
 
 export type LayerCopy = { headline: string; subhead: string; cta: string; eyebrow: string };
 
-// A per-region column stores one value per region under a suffixed key; a normal
-// column stores a single value under its bare key. These two helpers are the only
-// place that encoding lives.
-export function regionCellKey(colKey: string, region: string): string {
-  return `${colKey}::${region}`;
-}
-export function cellValue(col: CopyColumn, values: Record<string, string>, region?: string): string {
-  if (col.perRegion && region) return values[regionCellKey(col.key, region)] || "";
-  return values[col.key] || "";
-}
-
 // First column mapped to each layer wins. Lets a row drive a creative's copy.
-// For a per-region layer column, uses the given region (or the first region).
-export function rowToLayerCopy(schema: CopySchema, values: Record<string, string>, region?: string): LayerCopy {
+export function rowToLayerCopy(schema: CopySchema, values: Record<string, string>): LayerCopy {
   const pick = (layer: CopyColumn["layer"]) => {
     const col = schema.columns.find((c) => c.layer === layer);
-    if (!col) return "";
-    const reg = region || schema.regions[0];
-    if (col.perRegion && reg) return (values[regionCellKey(col.key, reg)] || "").trim();
-    return (values[col.key] || "").trim();
+    return col ? (values[col.key] || "").trim() : "";
   };
   return { headline: pick("headline"), subhead: pick("subhead"), cta: pick("cta"), eyebrow: pick("eyebrow") };
 }
 
 // Writes a creative's current copy back into the layer-mapped cells of a row,
-// preserving any non-layer columns (offers, notes, other regions' variants).
-export function layerCopyToRowValues(schema: CopySchema, current: Record<string, string>, copy: LayerCopy, region?: string): Record<string, string> {
+// preserving any non-layer columns (offers, notes, image).
+export function layerCopyToRowValues(schema: CopySchema, current: Record<string, string>, copy: LayerCopy): Record<string, string> {
   const next = { ...current };
-  const reg = region || schema.regions[0];
   const set = (layer: CopyColumn["layer"], val: string) => {
-    for (const c of schema.columns.filter((c) => c.layer === layer)) {
-      if (c.perRegion && reg) next[regionCellKey(c.key, reg)] = val;
-      else next[c.key] = val;
-    }
+    for (const c of schema.columns.filter((c) => c.layer === layer)) next[c.key] = val;
   };
   set("headline", copy.headline);
   set("subhead", copy.subhead);
