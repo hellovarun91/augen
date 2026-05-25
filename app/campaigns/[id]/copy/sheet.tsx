@@ -139,8 +139,8 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-xs text-ink-400">{rows.length} row{rows.length === 1 ? "" : "s"} · {columns.length} columns · link a row to a creative, write & proof, then send approved copy to design</div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setManageCols((v) => !v)}>Columns</Button>
-          <Button size="sm" onClick={addRow} disabled={pending}>+ Row</Button>
+          <Button size="sm" variant="secondary" onClick={() => setManageCols((v) => !v)}>Columns</Button>
+          <Button size="sm" variant="secondary" onClick={addRow} disabled={pending}>+ Row</Button>
         </div>
       </div>
 
@@ -212,7 +212,7 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
                 <tr key={r.id} className="border-t border-white/5 align-top">
                   <td className="px-3 py-2 sticky left-0 bg-ink-950 z-10 align-top">
                     <div className="space-y-1.5 min-w-[220px]">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-[11px] text-ink-500">#{i + 1}</span>
                         <select value={r.status} onChange={(e) => setStatus(r.id, e.target.value)}
                           className={"rounded-full px-2 py-0.5 text-[11px] ring-1 outline-none cursor-pointer " + (STATUS_TONE[r.status] || STATUS_TONE.draft)}>
@@ -220,6 +220,12 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
                           <option value="proof">In proof</option>
                           <option value="approved">Approved</option>
                         </select>
+                        {r.status !== "approved" && (
+                          <button onClick={() => approvePush(r.id)} disabled={pending}
+                            className="text-[11px] rounded-full px-2.5 py-0.5 bg-emerald-400/10 text-emerald-200 ring-1 ring-emerald-400/20 hover:bg-emerald-400/15">
+                            {r.generationId ? "Approve → design" : "Approve"}
+                          </button>
+                        )}
                       </div>
                       <select value={r.generationId || ""} onChange={(e) => link(r.id, e.target.value)}
                         className="w-full rounded-md bg-ink-800 px-2 py-1 text-[11px] text-ink-200 ring-1 ring-inset ring-white/10">
@@ -232,12 +238,6 @@ export function CopySheet({ campaignId, slug, schema, initialRows, generations }
                           <button onClick={() => push(r.id)} disabled={pending} className="text-[11px] rounded-md px-2 py-0.5 ring-1 ring-white/10 text-ink-300 hover:bg-white/5" title="Row → creative">↑ Push</button>
                           <Link href={`/ads/${r.generationId}`} className="text-[11px] text-ink-400 hover:text-white">open ↗</Link>
                         </div>
-                      )}
-                      {r.status !== "approved" && (
-                        <button onClick={() => approvePush(r.id)} disabled={pending}
-                          className="text-[11px] rounded-md px-2 py-0.5 bg-emerald-400/10 text-emerald-200 ring-1 ring-emerald-400/20 hover:bg-emerald-400/15">
-                          {r.generationId ? "Approve → design" : "Approve"}
-                        </button>
                       )}
                       {r.note && <div className="text-[10px] text-ink-400">{r.note}</div>}
                     </div>
