@@ -11,7 +11,7 @@ import { brainstormProjectsAI } from "@/lib/ai/brainstorm";
 import { defaultFormatSlugs } from "@/lib/formats";
 import { slugify } from "@/lib/utils";
 import { rateLimit } from "@/lib/ratelimit";
-import { generateAdsViaAgents } from "@/lib/agents/orchestrator";
+import { generateAdsViaAgents, strategistOnly } from "@/lib/agents/orchestrator";
 
 export interface McpTool {
   name: string;
@@ -27,6 +27,7 @@ export const TOOL_DEFS: McpTool[] = [
   { name: "list_projects", description: "List the projects (campaigns) under a brand.", inputSchema: { type: "object", properties: { brand: str("Brand slug.") }, required: ["brand"] } },
   { name: "brainstorm_projects", description: "Brainstorm build-ready project drafts for a brand from a plain-language goal (does NOT create them). Returns drafts you can then create_project.", inputSchema: { type: "object", properties: { brand: str("Brand slug."), goal: str("What you're working toward, e.g. 'spring launch, push samples'."), count: { type: "number", description: "How many drafts (1-6)." } }, required: ["brand", "goal"] } },
   { name: "create_project", description: "Create a project (campaign) under a brand.", inputSchema: { type: "object", properties: { brand: str("Brand slug."), name: str("Project name."), objective: str("awareness | consideration | conversion | retention"), audience: str("Target audience.") }, required: ["brand", "name"] } },
+  { name: "seed_ideas", description: "Generate idea seeds for a project (runs the Strategist). Needed before generate_ads if the project has none.", inputSchema: { type: "object", properties: { project: str("Project (campaign) id."), count: { type: "number", description: "How many idea seeds (default 4)." }, notes: str("Optional steer for the strategist.") }, required: ["project"] } },
   { name: "list_creatives", description: "List creatives. Pass a project id, or a brand slug for all of the brand's creatives. Includes status, copy QC confidence, and design score.", inputSchema: { type: "object", properties: { project: str("Project (campaign) id."), brand: str("Brand slug (alternative to project).") } } },
   { name: "get_creative", description: "Get one creative's full detail: copy, format, status, scores, and a render image URL.", inputSchema: { type: "object", properties: { id: str("Creative (generation) id.") }, required: ["id"] } },
   { name: "set_creative_status", description: "Approve, reject, or request revision on a creative.", inputSchema: { type: "object", properties: { id: str("Creative id."), status: { type: "string", enum: ["approved", "rejected", "needs_revision"] }, note: str("Optional reviewer note.") }, required: ["id", "status"] } },
@@ -93,6 +94,15 @@ export async function callTool(userId: string, name: string, args: Record<string
         brief: { objective, audience, productFocus: [], channels: [], formats: defaultFormatSlugs(), budget: 0, kpis: [], notes: "" },
       });
       return text(`Created project "${campaign.name}" (id: ${campaign.id}) in ${brand.name}. Add idea seeds or call generate_ads.`);
+    }
+    case "seed_ideas": {
+      const camp = getCampaign(String(args.project));
+      if (!camp || !hasBrandAccess(userId, camp.brand_id)) throw new Error("No access to that project.");
+      const brand = getBrand(camp.brand_id);
+      if (!brand) throw new Error("Brand missing.");
+      const count = Math.max(1, Math.min(8, Math.round(Number(args.count) || 4)));
+      const r = await strategistOnly({ campaignId: camp.id, brand, brief: camp.brief, language: brand.language, quarter: camp.quarter || undefined, year: camp.year || undefined, count, notes: args.notes ? String(args.notes) : undefined, userId });
+      return text(`Seeded ${r.ideaCount} idea(s) on "${camp.name}". You can now generate_ads.`);
     }
     case "list_creatives": {
       let gens;
