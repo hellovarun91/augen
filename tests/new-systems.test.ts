@@ -178,6 +178,24 @@ describe("vision QC critic (heuristic fallback)", () => {
   });
 });
 
+describe("MCP tool contract", () => {
+  it("exposes well-formed, uniquely-named tools", async () => {
+    const { TOOL_DEFS } = await import("@/lib/mcp/tools");
+    expect(TOOL_DEFS.length).toBeGreaterThanOrEqual(8);
+    const names = TOOL_DEFS.map((t) => t.name);
+    expect(new Set(names).size).toBe(names.length); // unique
+    for (const t of TOOL_DEFS) {
+      expect(t.name).toMatch(/^[a-z_]+$/);
+      expect(t.description.length).toBeGreaterThan(10);
+      expect(t.inputSchema.type).toBe("object");
+    }
+    // core workflow tools are present
+    for (const n of ["list_brands", "create_brand", "brainstorm_projects", "generate_ads", "set_creative_status"]) {
+      expect(names).toContain(n);
+    }
+  });
+});
+
 describe("figma token merge (live sync)", () => {
   it("overwrites only the keys Figma provided", async () => {
     const { mergeTokens } = await import("@/lib/figma/sync");

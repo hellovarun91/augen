@@ -88,6 +88,7 @@ export function SidebarNav({
           <nav className="space-y-0.5 mt-1.5">
             <NavItem href="/formats" label="Format catalog" active={path === "/formats"} />
             <NavItem href="/providers" label="AI providers" active={path === "/providers"} />
+            <NavItem href="/settings/mcp" label="MCP & API" active={path.startsWith("/settings/mcp")} />
           </nav>
         )}
       </div>

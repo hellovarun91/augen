@@ -1,5 +1,6 @@
 import { db, nowMs } from "./db";
 import { nanoid } from "nanoid";
+import { createHash, randomBytes } from "crypto";
 import { BrandLanguage, BrandTokens, type Brand, type BrandRow, type Campaign, type CampaignRow, type CampaignBrief, type Generation, type GenerationRow, type Idea, type IdeaRow } from "./types";
 import { parseCopySchema, defaultCopySchema, type CopySchema } from "./copy-schema";
 
@@ -297,6 +298,48 @@ export function updateGenerationStatus(id: string, status: string, note?: string
   db().prepare("INSERT INTO reviews (id, generation_id, action, note, reviewer, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
     rev, id, status, note ?? null, reviewerId ?? "studio", nowMs(),
   );
+}
+
+// ---------- API tokens (programmatic / MCP access) ----------
+export interface ApiTokenRow {
+  id: string; user_id: string; name: string; created_at: number; last_used_at: number | null;
+}
+
+function hashToken(plaintext: string): string {
+  return createHash("sha256").update(plaintext).digest("hex");
+}
+
+// Creates a token, returns the PLAINTEXT once (only the hash is stored).
+export function createApiToken(userId: string, name: string): { token: string; row: ApiTokenRow } {
+  const id = `tok_${nanoid(10)}`;
+  const plaintext = `augen_${randomBytes(24).toString("hex")}`;
+  db().prepare("INSERT INTO api_tokens (id, user_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(id, userId, name.trim() || "Untitled token", hashToken(plaintext), nowMs());
+  const row = db().prepare("SELECT id, user_id, name, created_at, last_used_at FROM api_tokens WHERE id = ?").get(id) as ApiTokenRow;
+  return { token: plaintext, row };
+}
+
+export function listApiTokens(userId: string): ApiTokenRow[] {
+  return db().prepare("SELECT id, user_id, name, created_at, last_used_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC").all(userId) as ApiTokenRow[];
+}
+
+export function revokeApiToken(id: string, userId: string) {
+  db().prepare("DELETE FROM api_tokens WHERE id = ? AND user_id = ?").run(id, userId);
+}
+
+// Resolves a plaintext token to its user id (and stamps last_used_at).
+export function resolveApiToken(plaintext: string): string | null {
+  if (!plaintext || !plaintext.startsWith("augen_")) return null;
+  const row = db().prepare("SELECT id, user_id FROM api_tokens WHERE token_hash = ?").get(hashToken(plaintext)) as { id: string; user_id: string } | undefined;
+  if (!row) return null;
+  db().prepare("UPDATE api_tokens SET last_used_at = ? WHERE id = ?").run(nowMs(), row.id);
+  return row.user_id;
+}
+
+// Membership-based access check (token-scoped, no session).
+export function hasBrandAccess(userId: string, brandId: string): boolean {
+  const m = db().prepare("SELECT 1 FROM memberships WHERE user_id = ? AND brand_id = ? LIMIT 1").get(userId, brandId);
+  return !!m;
 }
 
 // ---------- Figma live-sync webhooks ----------
