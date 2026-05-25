@@ -99,15 +99,15 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
               return (
                 <Card key={idea.id} className="p-5 space-y-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <div className="serif text-xl tracking-tight">{idea.theme}</div>
-                      <div className="text-xs text-ink-400 mt-1">{idea.angle} · {idea.audience}</div>
+                      <div className="text-xs text-ink-400 mt-1 truncate">{idea.angle} · {idea.audience}</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge>{ideaGens.length} ads</Badge>
-                      <Link href={`/campaigns/${campaign.id}/ideas/${idea.id}/lab`} className="text-xs text-ink-200 hover:text-white">Copy Lab →</Link>
-                      <Link href={`/campaigns/${campaign.id}/ideas/${idea.id}/variations`} className="text-xs text-ink-200 hover:text-white">Variations →</Link>
-                    </div>
+                    <Badge className="shrink-0">{ideaGens.length} ads</Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs -mt-1">
+                    <Link href={`/campaigns/${campaign.id}/ideas/${idea.id}/lab`} className="text-ink-200 hover:text-white whitespace-nowrap">Copy Lab →</Link>
+                    <Link href={`/campaigns/${campaign.id}/ideas/${idea.id}/variations`} className="text-ink-200 hover:text-white whitespace-nowrap">Variations →</Link>
                   </div>
                   <div className="text-sm text-ink-200">{idea.insight}</div>
                   <div>
@@ -154,8 +154,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
                   {slice.map((g) => (
                     <Link key={g.id} href={`/ads/${g.id}`} className="block space-y-2">
                       <AdPreview generationId={g.id} width={g.width} height={g.height} />
-                      <div className="flex items-center justify-between text-xs text-ink-300">
-                        <span className="line-clamp-1">{g.headline.replace(/\n/g, " ")}</span>
+                      <div className="flex items-center justify-between gap-2 text-xs text-ink-300">
+                        <span className="min-w-0 truncate">{g.headline.replace(/\n/g, " ")}</span>
                         <Badge tone={g.status === "approved" ? "ok" : g.status === "rejected" ? "danger" : g.status === "needs_revision" ? "warn" : "neutral"}>
                           {g.status.replace("_", " ")}
                         </Badge>

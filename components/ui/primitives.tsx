@@ -91,7 +91,7 @@ export function Badge({ children, tone = "neutral", className }: { children: Rea
     danger: "bg-rose-500/15 text-rose-200 ring-rose-500/30",
     info: "bg-sky-500/15 text-sky-200 ring-sky-500/30",
   } as const;
-  return <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] tracking-wide ring-1", tones[tone], className)}>{children}</span>;
+  return <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] tracking-wide ring-1 whitespace-nowrap", tones[tone], className)}>{children}</span>;
 }
 
 export function Eyebrow({ children, className }: { children: React.ReactNode; className?: string }) {
