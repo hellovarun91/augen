@@ -639,19 +639,14 @@ export function setProjectCopySchema(campaignId: string, schema: CopySchema) {
   db().prepare("UPDATE campaigns SET copy_schema = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(schema), nowMs(), campaignId);
 }
 
-// ---------- Project size set (#46) ----------
-// The formats every copy row fans out to. Defaults to the four canonical aspects
-// (1:1, 4:5, 9:16, 16:9) until the project picks its own.
+// ---------- Project size set ----------
+// The formats every copy row fans out to (#47). This is the SAME set the project
+// already manages in its brief ("Formats enabled" on the project page) — not a
+// second store. Falls back to the canonical aspects only if the brief is empty.
 export function getProjectSizes(campaignId: string): string[] {
-  const row = db().prepare("SELECT sizes_json FROM campaigns WHERE id = ?").get(campaignId) as { sizes_json: string | null } | undefined;
-  if (!row?.sizes_json) return defaultProjectSizes();
-  try { const arr = JSON.parse(row.sizes_json); return Array.isArray(arr) && arr.length ? arr.filter((s) => typeof s === "string") : defaultProjectSizes(); }
-  catch { return defaultProjectSizes(); }
-}
-
-export function setProjectSizes(campaignId: string, slugs: string[]) {
-  const clean = Array.from(new Set(slugs.filter((s) => typeof s === "string" && s)));
-  db().prepare("UPDATE campaigns SET sizes_json = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(clean), nowMs(), campaignId);
+  const c = getCampaign(campaignId);
+  const formats = c?.brief?.formats;
+  return Array.isArray(formats) && formats.length ? formats : defaultProjectSizes();
 }
 
 // ---------- Copy Sheet rows ----------

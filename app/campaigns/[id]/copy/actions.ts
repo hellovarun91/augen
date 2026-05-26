@@ -2,7 +2,6 @@
 import {
   getCampaign, createCopyRow, updateCopyRow, deleteCopyRow, setProjectCopySchema,
   getCopyRow, linkCopyRow, getProjectCopySchema, getGeneration, updateGenerationCopy,
-  setProjectSizes,
 } from "@/lib/repo";
 import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
 import { requireCampaignAccess } from "@/lib/authz";
@@ -35,14 +34,6 @@ export async function setRowNameAction(campaignId: string, rowId: string, name: 
   await requireCampaignAccess(campaignId);
   rowInProject(campaignId, rowId);
   updateCopyRow(rowId, { name: name.trim().slice(0, 80) });
-  revalidatePath(`/campaigns/${campaignId}/copy`);
-}
-
-// The project size set: the formats every row fans out to (#46).
-export async function saveSizesAction(campaignId: string, slugs: string[]) {
-  await requireCampaignAccess(campaignId);
-  if (!Array.isArray(slugs) || slugs.length === 0) throw new Error("Pick at least one size.");
-  setProjectSizes(campaignId, slugs);
   revalidatePath(`/campaigns/${campaignId}/copy`);
 }
 
