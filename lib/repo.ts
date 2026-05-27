@@ -2,7 +2,7 @@ import { db, nowMs } from "./db";
 import { nanoid } from "nanoid";
 import { createHash, randomBytes } from "crypto";
 import { BrandLanguage, BrandTokens, type Brand, type BrandRow, type Campaign, type CampaignRow, type CampaignBrief, type Generation, type GenerationRow, type Idea, type IdeaRow } from "./types";
-import { parseCopySchema, defaultCopySchema, layerCopyToRowValues, type CopySchema } from "./copy-schema";
+import { parseCopySchema, defaultCopySchema, layerCopyToRowValues, rowToLayerCopy, type CopySchema } from "./copy-schema";
 import { defaultProjectSizes } from "./formats";
 
 export function listBrands(): Brand[] {
@@ -290,6 +290,68 @@ export function listDesignsByRow(campaignId: string): Record<string, Generation[
     (out[(r as any).copy_row_id] ||= []).push(g);
   }
   return out;
+}
+
+// ---------- #49: copy↔design approval + sync ----------
+
+const STALE_AND_CLEAR_APPROVAL =
+  "UPDATE generations SET stale = ?, status = CASE WHEN status='approved' THEN 'needs_revision' ELSE status END, updated_at = ? WHERE id = ?";
+
+// Row copy changed → mark every design whose copy now differs from the row stale,
+// and clear any visual approval. Precise: untouched designs aren't disturbed.
+export function markRowDesignsStale(rowId: string) {
+  const row = getCopyRow(rowId); if (!row) return;
+  const want = rowToLayerCopy(getProjectCopySchema(row.campaign_id), row.values);
+  for (const d of listDesignsForRow(rowId)) {
+    const differs = (d.headline || "") !== want.headline || (d.subhead || "") !== want.subhead
+      || (d.cta || "") !== want.cta || (d.eyebrow || "") !== (want.eyebrow || "");
+    if (differs) db().prepare(STALE_AND_CLEAR_APPROVAL).run(1, nowMs(), d.id);
+  }
+}
+
+// Write a design's current copy back into its source row (row stays the source of truth).
+export function syncDesignCopyToRow(genId: string): string | null {
+  const g = getGeneration(genId);
+  if (!g || !g.copy_row_id) return null;
+  const row = getCopyRow(g.copy_row_id); if (!row) return null;
+  const values = layerCopyToRowValues(getProjectCopySchema(row.campaign_id), row.values, {
+    headline: g.headline, subhead: g.subhead || "", cta: g.cta, eyebrow: g.eyebrow || "",
+  });
+  updateCopyRow(row.id, { values });
+  return row.id;
+}
+
+// A design's copy was edited: it's now current (un-stale) but its look needs a
+// re-look (clear approval); its row is updated to match, and siblings go stale.
+export function onDesignCopyEdited(genId: string): { rowId: string | null; siblingCount: number } {
+  const g = getGeneration(genId);
+  if (!g) return { rowId: null, siblingCount: 0 };
+  db().prepare(STALE_AND_CLEAR_APPROVAL).run(0, nowMs(), genId);
+  if (!g.copy_row_id) return { rowId: null, siblingCount: 0 };
+  const rowId = syncDesignCopyToRow(genId);
+  const siblings = listDesignsForRow(g.copy_row_id).filter((d) => d.id !== genId);
+  for (const d of siblings) db().prepare(STALE_AND_CLEAR_APPROVAL).run(1, nowMs(), d.id);
+  return { rowId, siblingCount: siblings.length };
+}
+
+// Push one design's copy onto its siblings (same row, other sizes): they match it,
+// are no longer stale, but need a re-look. Returns how many siblings were updated.
+export function applyCopyToRowSiblings(genId: string): number {
+  const g = getGeneration(genId);
+  if (!g || !g.copy_row_id) return 0;
+  const siblings = listDesignsForRow(g.copy_row_id).filter((d) => d.id !== genId);
+  for (const d of siblings) {
+    updateGenerationCopy(d.id, { headline: g.headline, subhead: g.subhead || "", cta: g.cta, eyebrow: g.eyebrow || undefined });
+    db().prepare(STALE_AND_CLEAR_APPROVAL).run(0, nowMs(), d.id);
+  }
+  syncDesignCopyToRow(genId);
+  return siblings.length;
+}
+
+// A design ships only when its row's copy is approved AND its own visual is
+// approved AND it isn't stale. The predicate the Deliverables gate (#50) uses.
+export function designReady(d: { status: string; stale?: number | null }, rowApproved: boolean): boolean {
+  return rowApproved && d.status === "approved" && !d.stale;
 }
 
 export function getGeneration(id: string): Generation | null {

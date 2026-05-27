@@ -196,6 +196,8 @@ export interface GenerationRow {
   design_score: number | null;
   design_notes: string | null;
   cost_cents: number;
+  copy_row_id: string | null; // source Copy Sheet row, when fanned out (#47)
+  stale: number;              // 1 = copy diverged from its row; needs re-render (#49)
   created_at: number;
   updated_at: number;
 }

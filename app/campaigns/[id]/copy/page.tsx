@@ -15,9 +15,9 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
   const schema = getProjectCopySchema(campaign.id);
   const rows = syncCopyRowsForCampaign(campaign.id);
   const designsByRow = listDesignsByRow(campaign.id);
-  const initialDesigns: Record<string, { id: string; aspect: string; format_slug: string }[]> = {};
+  const initialDesigns: Record<string, { id: string; aspect: string; format_slug: string; status: string; stale: number }[]> = {};
   for (const [rowId, gens] of Object.entries(designsByRow)) {
-    initialDesigns[rowId] = gens.map((g) => ({ id: g.id, aspect: g.aspect, format_slug: g.format_slug }));
+    initialDesigns[rowId] = gens.map((g) => ({ id: g.id, aspect: g.aspect, format_slug: g.format_slug, status: g.status, stale: g.stale }));
   }
 
   return (

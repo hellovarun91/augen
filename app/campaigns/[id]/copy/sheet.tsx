@@ -36,7 +36,7 @@ function CellBox({ value, maxChars, onChange, onBlur }: { value: string; maxChar
   );
 }
 
-interface DesignLite { id: string; aspect: string; format_slug: string }
+interface DesignLite { id: string; aspect: string; format_slug: string; status: string; stale: number }
 interface RowState { id: string; name: string; values: Record<string, string>; status: string }
 
 const STATUS_TONE: Record<string, string> = {
@@ -220,19 +220,33 @@ export function CopySheet({ campaignId, slug, schema, initialRows, initialDesign
                   ))}
                   <td className="px-3 py-2 border-l border-white/5 align-top">
                     {ds.length ? (
-                      <div className="space-y-1.5">
-                        <div className="flex flex-wrap gap-1.5">
-                          {ds.map((d) => (
-                            <Link key={d.id} href={`/ads/${d.id}`} title={d.aspect} className="block shrink-0">
-                              <img src={`/api/render/${d.id}/png?w=120`} alt={d.aspect} loading="lazy"
-                                className="h-12 w-auto max-w-[80px] object-cover rounded ring-1 ring-white/10 hover:ring-white/40 transition" />
-                            </Link>
-                          ))}
-                        </div>
-                        <button onClick={() => generateRow(r.id)} disabled={pending} className="text-[11px] text-ink-400 hover:text-white disabled:opacity-50">
-                          {busyRow === r.id ? "Regenerating…" : "↻ Regenerate"}
-                        </button>
-                      </div>
+                      (() => {
+                        const approved = ds.filter((d) => d.status === "approved" && !d.stale).length;
+                        const staleN = ds.filter((d) => d.stale).length;
+                        return (
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap gap-1.5">
+                              {ds.map((d) => {
+                                const ring = d.stale ? "ring-amber-400/60" : d.status === "approved" ? "ring-emerald-400/60" : "ring-white/10 hover:ring-white/40";
+                                const state = d.stale ? "stale — re-render" : d.status === "approved" ? "approved" : d.status.replace(/_/g, " ");
+                                return (
+                                  <Link key={d.id} href={`/ads/${d.id}`} title={`${d.aspect} · ${state}`} className="block shrink-0">
+                                    <img src={`/api/render/${d.id}/png?w=120`} alt={d.aspect} loading="lazy"
+                                      className={"h-12 w-auto max-w-[80px] object-cover rounded ring-1 transition " + ring} />
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] flex-wrap">
+                              {approved > 0 && <span className="text-emerald-300">{approved} approved</span>}
+                              {staleN > 0 && <span className="text-amber-300">{staleN} stale</span>}
+                              <button onClick={() => generateRow(r.id)} disabled={pending} className="text-ink-400 hover:text-white disabled:opacity-50">
+                                {busyRow === r.id ? "Re-rendering…" : staleN ? `↻ Re-render (${staleN})` : "↻ Regenerate"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()
                     ) : (
                       <button onClick={() => generateRow(r.id)} disabled={pending}
                         className="text-[11px] rounded-md px-2.5 py-1 ring-1 ring-white/15 text-ink-200 hover:bg-white/5 disabled:opacity-50">

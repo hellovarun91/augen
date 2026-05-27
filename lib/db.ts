@@ -268,6 +268,9 @@ function migrate(d: Database.Database) {
   // Ideate (#48): a copy row promoted from a Strategist angle remembers its source
   // idea, so the Ideate surface can show which angles are already in the sheet.
   try { d.prepare("ALTER TABLE copy_rows ADD COLUMN idea_id TEXT").run(); } catch {}
+  // Approval + sync (#49): a fan-out design is "stale" when its row's copy changed
+  // after it rendered — it must be re-rendered before it can ship.
+  try { d.prepare("ALTER TABLE generations ADD COLUMN stale INTEGER NOT NULL DEFAULT 0").run(); } catch {}
   // Vision QC critic: design score (0-1) + notes from inspecting the rendered pixels
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_score REAL").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_notes TEXT").run(); } catch {}

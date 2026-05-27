@@ -2,16 +2,16 @@
 import {
   getCampaign, createCopyRow, updateCopyRow, deleteCopyRow, setProjectCopySchema,
   getCopyRow, linkCopyRow, getProjectCopySchema, getGeneration, updateGenerationCopy,
-  listDesignsForRow, listCopyRows,
+  listDesignsForRow, listCopyRows, markRowDesignsStale,
 } from "@/lib/repo";
 import { generateDesignsForRow, generateDesignsForCampaign } from "@/lib/copy-fanout";
 import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
 import { requireCampaignAccess } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
 
-// Slim, serializable view of a design for the client (thumbnail + link).
-function designLite(d: { id: string; aspect: string; format_slug: string }) {
-  return { id: d.id, aspect: d.aspect, format_slug: d.format_slug };
+// Slim, serializable view of a design for the client (thumbnail + link + state).
+function designLite(d: { id: string; aspect: string; format_slug: string; status: string; stale: number }) {
+  return { id: d.id, aspect: d.aspect, format_slug: d.format_slug, status: d.status, stale: d.stale };
 }
 
 // Confirms a row belongs to the project — guards every cross-object sync action.
@@ -32,7 +32,11 @@ export async function addRowAction(campaignId: string, name = "") {
 
 export async function updateRowAction(campaignId: string, rowId: string, values: Record<string, string>) {
   await requireCampaignAccess(campaignId);
+  rowInProject(campaignId, rowId);
   updateCopyRow(rowId, { values });
+  // Integrity (#49): the row is the source of truth — any design whose copy now
+  // diverges goes stale and loses its approval until re-rendered.
+  markRowDesignsStale(rowId);
   revalidatePath(`/campaigns/${campaignId}/copy`);
 }
 

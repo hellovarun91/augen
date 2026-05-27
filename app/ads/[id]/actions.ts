@@ -2,6 +2,7 @@
 import {
   updateGenerationStatus, updateGenerationCopy, setGenerationWinner,
   getBrand, getGenerationOverrides, updateGenerationOverrides, recordVisionReview,
+  onDesignCopyEdited, applyCopyToRowSiblings,
 } from "@/lib/repo";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -105,8 +106,26 @@ export async function runVisualQcAction(id: string): Promise<VisionCritique> {
   return output;
 }
 
+// Edit a design's copy. The row is the source of truth, so this flows back to it;
+// the design is no longer stale but its look needs a re-look, and its siblings (the
+// row's other sizes) go stale. Returns how many siblings can be brought in line.
 export async function saveCopy(id: string, copy: { headline: string; subhead: string; cta: string; eyebrow: string }) {
-  await requireGenerationAccess(id);
+  const { generation } = await requireGenerationAccess(id);
   updateGenerationCopy(id, { headline: copy.headline, subhead: copy.subhead, cta: copy.cta, eyebrow: copy.eyebrow || undefined });
+  const { rowId, siblingCount } = onDesignCopyEdited(id);
   revalidatePath(`/ads/${id}`);
+  if (generation.campaign_id) revalidatePath(`/campaigns/${generation.campaign_id}/copy`);
+  revalidatePath("/review");
+  return { rowId, siblingCount };
+}
+
+// Push this design's copy onto the row's other sizes (so they match), then they
+// need a re-look. Returns the number of siblings updated.
+export async function applyCopyToSiblingsAction(id: string) {
+  const { generation } = await requireGenerationAccess(id);
+  const count = applyCopyToRowSiblings(id);
+  revalidatePath(`/ads/${id}`);
+  if (generation.campaign_id) revalidatePath(`/campaigns/${generation.campaign_id}/copy`);
+  revalidatePath("/review");
+  return count;
 }
