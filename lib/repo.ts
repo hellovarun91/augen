@@ -231,7 +231,7 @@ export function listIdeas(campaignId: string): Idea[] {
 
 export interface NewGen {
   campaignId: string;
-  ideaId: string;
+  ideaId: string | null;
   brandId: string;
   formatSlug: string;
   aspect: string;
@@ -248,6 +248,7 @@ export interface NewGen {
   palette: string[];
   confidence: number;
   costCents: number;
+  copyRowId?: string | null; // set when fanned out from a Copy Sheet row (#47)
 }
 
 export function createGeneration(input: NewGen): Generation {
@@ -258,16 +259,37 @@ export function createGeneration(input: NewGen): Generation {
       id, campaign_id, idea_id, brand_id, format_slug, aspect, width, height,
       headline, subhead, cta, eyebrow,
       copy_json, image_prompt, image_seed, image_style, palette,
-      status, confidence, cost_cents, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', ?, ?, ?, ?)
+      status, confidence, cost_cents, copy_row_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', ?, ?, ?, ?, ?)
   `).run(
-    id, input.campaignId, input.ideaId, input.brandId,
+    id, input.campaignId, input.ideaId || null, input.brandId,
     input.formatSlug, input.aspect, input.width, input.height,
     input.headline, input.subhead, input.cta, input.eyebrow || null,
     JSON.stringify(input.copy), input.imagePrompt, input.imageSeed, input.imageStyle,
-    JSON.stringify(input.palette), input.confidence, input.costCents, now, now,
+    JSON.stringify(input.palette), input.confidence, input.costCents, input.copyRowId || null, now, now,
   );
   return getGeneration(id)!;
+}
+
+export function deleteGeneration(id: string) {
+  db().prepare("DELETE FROM generations WHERE id = ?").run(id);
+}
+
+// Designs fanned out from a copy row (#47), oldest first.
+export function listDesignsForRow(rowId: string): Generation[] {
+  const rows = db().prepare("SELECT * FROM generations WHERE copy_row_id = ? ORDER BY created_at ASC").all(rowId) as GenerationRow[];
+  return rows.map((r) => ({ ...r, copy: JSON.parse(r.copy_json || "[]"), palette: JSON.parse(r.palette || "[]") }));
+}
+
+// All fan-out designs in a project, grouped by their source row id.
+export function listDesignsByRow(campaignId: string): Record<string, Generation[]> {
+  const rows = db().prepare("SELECT * FROM generations WHERE campaign_id = ? AND copy_row_id IS NOT NULL ORDER BY created_at ASC").all(campaignId) as GenerationRow[];
+  const out: Record<string, Generation[]> = {};
+  for (const r of rows) {
+    const g = { ...r, copy: JSON.parse(r.copy_json || "[]"), palette: JSON.parse(r.palette || "[]") } as Generation;
+    (out[(r as any).copy_row_id] ||= []).push(g);
+  }
+  return out;
 }
 
 export function getGeneration(id: string): Generation | null {
@@ -696,7 +718,9 @@ export function syncCopyRowsForCampaign(campaignId: string): CopyRow[] {
   const schema = getProjectCopySchema(campaignId);
   const rows = listCopyRows(campaignId);
   const linked = new Set(rows.map((r) => r.generation_id).filter(Boolean) as string[]);
-  const gens = listGenerationsByCampaign(campaignId);
+  // Only standalone creatives seed rows — designs fanned out FROM a row (copy_row_id
+  // set) must never spawn their own rows, or every fan-out would multiply the sheet.
+  const gens = listGenerationsByCampaign(campaignId).filter((g) => !(g as any).copy_row_id);
   let created = false;
   for (const g of gens) {
     if (linked.has(g.id)) continue;

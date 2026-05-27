@@ -2,10 +2,17 @@
 import {
   getCampaign, createCopyRow, updateCopyRow, deleteCopyRow, setProjectCopySchema,
   getCopyRow, linkCopyRow, getProjectCopySchema, getGeneration, updateGenerationCopy,
+  listDesignsForRow, listCopyRows,
 } from "@/lib/repo";
+import { generateDesignsForRow, generateDesignsForCampaign } from "@/lib/copy-fanout";
 import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
 import { requireCampaignAccess } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
+
+// Slim, serializable view of a design for the client (thumbnail + link).
+function designLite(d: { id: string; aspect: string; format_slug: string }) {
+  return { id: d.id, aspect: d.aspect, format_slug: d.format_slug };
+}
 
 // Confirms a row belongs to the project — guards every cross-object sync action.
 function rowInProject(campaignId: string, rowId: string) {
@@ -35,6 +42,31 @@ export async function setRowNameAction(campaignId: string, rowId: string, name: 
   rowInProject(campaignId, rowId);
   updateCopyRow(rowId, { name: name.trim().slice(0, 80) });
   revalidatePath(`/campaigns/${campaignId}/copy`);
+}
+
+// ---------- #47: row → designs fan-out ----------
+// Fan one row's copy across the project's formats. Returns the fresh designs.
+export async function generateDesignsAction(campaignId: string, rowId: string) {
+  await requireCampaignAccess(campaignId);
+  rowInProject(campaignId, rowId);
+  const designs = generateDesignsForRow(campaignId, rowId);
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+  revalidatePath(`/campaigns/${campaignId}`);
+  return designs.map(designLite);
+}
+
+// Fan out every row that has copy. Returns counts + the new designs per row.
+export async function generateAllDesignsAction(campaignId: string) {
+  await requireCampaignAccess(campaignId);
+  const result = generateDesignsForCampaign(campaignId);
+  const byRow: Record<string, ReturnType<typeof designLite>[]> = {};
+  for (const row of listCopyRows(campaignId)) {
+    const designs = listDesignsForRow(row.id);
+    if (designs.length) byRow[row.id] = designs.map(designLite);
+  }
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+  revalidatePath(`/campaigns/${campaignId}`);
+  return { ...result, byRow };
 }
 
 export async function deleteRowAction(campaignId: string, rowId: string) {

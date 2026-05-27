@@ -1,4 +1,4 @@
-import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign } from "@/lib/repo";
+import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign, listDesignsByRow } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
@@ -14,6 +14,11 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
   if (!brand) notFound();
   const schema = getProjectCopySchema(campaign.id);
   const rows = syncCopyRowsForCampaign(campaign.id);
+  const designsByRow = listDesignsByRow(campaign.id);
+  const initialDesigns: Record<string, { id: string; aspect: string; format_slug: string }[]> = {};
+  for (const [rowId, gens] of Object.entries(designsByRow)) {
+    initialDesigns[rowId] = gens.map((g) => ({ id: g.id, aspect: g.aspect, format_slug: g.format_slug }));
+  }
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-[1400px] mx-auto space-y-6">
@@ -27,7 +32,7 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
         </p>
       </div>
 
-      <CopySheet campaignId={campaign.id} slug={brand.slug} schema={schema} initialRows={rows} />
+      <CopySheet campaignId={campaign.id} slug={brand.slug} schema={schema} initialRows={rows} initialDesigns={initialDesigns} />
     </div>
   );
 }

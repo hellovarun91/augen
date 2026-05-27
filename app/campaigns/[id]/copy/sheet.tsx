@@ -7,7 +7,7 @@ import { classifyLabel } from "@/lib/copy-schema";
 import type { CopyRow } from "@/lib/repo";
 import {
   addRowAction, updateRowAction, deleteRowAction, saveColumnsAction,
-  setRowStatusAction, setRowNameAction,
+  setRowStatusAction, setRowNameAction, generateDesignsAction, generateAllDesignsAction,
 } from "./actions";
 
 // A copy cell: blends into the grid, rings on interaction, auto-grows to its
@@ -36,6 +36,7 @@ function CellBox({ value, maxChars, onChange, onBlur }: { value: string; maxChar
   );
 }
 
+interface DesignLite { id: string; aspect: string; format_slug: string }
 interface RowState { id: string; name: string; values: Record<string, string>; status: string }
 
 const STATUS_TONE: Record<string, string> = {
@@ -44,13 +45,17 @@ const STATUS_TONE: Record<string, string> = {
   approved: "bg-emerald-400/10 text-emerald-200 ring-emerald-400/20",
 };
 
-export function CopySheet({ campaignId, slug, schema, initialRows }: {
+export function CopySheet({ campaignId, slug, schema, initialRows, initialDesigns }: {
   campaignId: string; slug: string; schema: CopySchema; initialRows: CopyRow[];
+  initialDesigns: Record<string, DesignLite[]>;
 }) {
   const [columns, setColumns] = useState<CopyColumn[]>(schema.columns);
   const [rows, setRows] = useState<RowState[]>(initialRows.map((r) => ({ id: r.id, name: r.name || "", values: { ...r.values }, status: r.status })));
+  const [designs, setDesigns] = useState<Record<string, DesignLite[]>>(initialDesigns);
   const [manageCols, setManageCols] = useState(false);
   const [newCol, setNewCol] = useState("");
+  const [busyRow, setBusyRow] = useState<string | null>(null); // rowId | "all"
+  const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function saveSchema(nextCols: CopyColumn[]) {
@@ -80,11 +85,29 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
   }
   function removeRow(rowId: string) {
     setRows((rs) => rs.filter((r) => r.id !== rowId));
+    setDesigns((m) => { const n = { ...m }; delete n[rowId]; return n; });
     start(async () => { await deleteRowAction(campaignId, rowId); });
   }
   function setStatus(rowId: string, status: string) {
     patchRow(rowId, { status });
     start(async () => { await setRowStatusAction(campaignId, rowId, status); });
+  }
+
+  function generateRow(rowId: string) {
+    setErr(null); setBusyRow(rowId);
+    start(async () => {
+      try { const ds = await generateDesignsAction(campaignId, rowId); setDesigns((m) => ({ ...m, [rowId]: ds })); }
+      catch (e: any) { setErr(e?.message || "Generation failed"); }
+      finally { setBusyRow(null); }
+    });
+  }
+  function generateAll() {
+    setErr(null); setBusyRow("all");
+    start(async () => {
+      try { const res = await generateAllDesignsAction(campaignId); setDesigns(res.byRow); }
+      catch (e: any) { setErr(e?.message || "Generation failed"); }
+      finally { setBusyRow(null); }
+    });
   }
 
   function addColumn() {
@@ -106,13 +129,16 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-xs text-ink-400">
-          {rows.length} variation{rows.length === 1 ? "" : "s"} · {columns.length} layer{columns.length === 1 ? "" : "s"}
+          {rows.length} variation{rows.length === 1 ? "" : "s"} · {columns.length} layer{columns.length === 1 ? "" : "s"} · each renders in every project format
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" onClick={generateAll} disabled={pending}>{busyRow === "all" ? "Generating…" : "Generate all designs"}</Button>
           <Button size="sm" variant="secondary" onClick={() => setManageCols((v) => !v)}>Columns</Button>
           <Button size="sm" variant="secondary" onClick={addRow} disabled={pending}>+ Row</Button>
         </div>
       </div>
+
+      {err && <div className="rounded-lg ring-1 ring-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{err}</div>}
 
       {manageCols && (
         <div className="rounded-xl ring-1 ring-white/10 p-3 space-y-3 max-w-2xl">
@@ -156,11 +182,15 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
                     <div className="text-[10px] text-ink-500">{c.layer !== "none" ? `→ ${c.layer}` : c.role}{c.maxChars ? ` · ≤${c.maxChars}` : ""}</div>
                   </th>
                 ))}
+                <th className="text-left text-[10px] text-ink-500 font-normal px-3 py-2 min-w-[180px] border-l border-white/5">DESIGNS</th>
                 <th className="w-10 border-l border-white/5"></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
+              {rows.map((r, i) => {
+                const ds = designs[r.id] || [];
+                const rowBusy = busyRow === r.id || busyRow === "all";
+                return (
                 <tr key={r.id} className="border-t border-white/5 align-top">
                   <td className="px-3 py-2 sticky left-0 bg-ink-950 z-10 align-top">
                     <div className="space-y-1.5 w-[196px]">
@@ -188,11 +218,34 @@ export function CopySheet({ campaignId, slug, schema, initialRows }: {
                       <CellBox value={r.values[c.key] || ""} maxChars={c.maxChars} onChange={(val) => setCell(r.id, c.key, val)} onBlur={() => commit(r.id)} />
                     </td>
                   ))}
+                  <td className="px-3 py-2 border-l border-white/5 align-top">
+                    {ds.length ? (
+                      <div className="space-y-1.5">
+                        <div className="flex flex-wrap gap-1.5">
+                          {ds.map((d) => (
+                            <Link key={d.id} href={`/ads/${d.id}`} title={d.aspect} className="block shrink-0">
+                              <img src={`/api/render/${d.id}/png?w=120`} alt={d.aspect} loading="lazy"
+                                className="h-12 w-auto max-w-[80px] object-cover rounded ring-1 ring-white/10 hover:ring-white/40 transition" />
+                            </Link>
+                          ))}
+                        </div>
+                        <button onClick={() => generateRow(r.id)} disabled={pending} className="text-[11px] text-ink-400 hover:text-white disabled:opacity-50">
+                          {busyRow === r.id ? "Regenerating…" : "↻ Regenerate"}
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => generateRow(r.id)} disabled={pending}
+                        className="text-[11px] rounded-md px-2.5 py-1 ring-1 ring-white/15 text-ink-200 hover:bg-white/5 disabled:opacity-50">
+                        {rowBusy ? "Generating…" : "Generate designs"}
+                      </button>
+                    )}
+                  </td>
                   <td className="px-2 py-2 border-l border-white/5 text-center align-top">
                     <button onClick={() => removeRow(r.id)} className="text-ink-500 hover:text-rose-300" title="Delete row">✕</button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

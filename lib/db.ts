@@ -260,6 +260,11 @@ function migrate(d: Database.Database) {
   // is the set of formats every row renders in.
   try { d.prepare("ALTER TABLE copy_rows ADD COLUMN name TEXT").run(); } catch {}
   try { d.prepare("ALTER TABLE campaigns ADD COLUMN sizes_json TEXT").run(); } catch {}
+  // Row→designs fan-out (#47): a generated design belongs to the copy row it was
+  // fanned out from (one row → one design per project format). NULL = a standalone
+  // creative (agentic chain, variations, legacy) not driven by the Copy Sheet.
+  try { d.prepare("ALTER TABLE generations ADD COLUMN copy_row_id TEXT").run(); } catch {}
+  try { d.prepare("CREATE INDEX IF NOT EXISTS gen_copy_row_idx ON generations(copy_row_id)").run(); } catch {}
   // Vision QC critic: design score (0-1) + notes from inspecting the rendered pixels
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_score REAL").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_notes TEXT").run(); } catch {}
