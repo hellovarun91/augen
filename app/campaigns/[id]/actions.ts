@@ -1,6 +1,7 @@
 "use server";
 import { generateAdsViaAgents, strategistOnly } from "@/lib/agents/orchestrator";
-import { getBrand, getCampaign, upsertCampaignFormat, signOffCampaign, clearCampaignSignoff } from "@/lib/repo";
+import { getBrand, getCampaign, upsertCampaignFormat, signOffCampaign, clearCampaignSignoff, getIdea, deleteIdea, createCopyRow, getProjectCopySchema } from "@/lib/repo";
+import { layerCopyToRowValues } from "@/lib/copy-schema";
 import { db, nowMs } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -78,6 +79,35 @@ export async function runStrategistAction(campaignId: string, opts: { count: num
   revalidatePath(`/campaigns/${campaignId}`);
   revalidatePath(`/campaigns/${campaignId}/agents`);
   return result;
+}
+
+// ---------- #48: Ideate → Copy Sheet bridge ----------
+// Turn a Strategist angle into a Copy Sheet row: its theme names the variation,
+// its hook/promise seed the draft copy. This is what makes Ideate valuable — the
+// easiest way to get real, rationale-backed rows into the sheet.
+export async function addIdeaToCopySheetAction(campaignId: string, ideaId: string) {
+  const { campaign: c } = await requireCampaignAccess(campaignId);
+  const idea = getIdea(ideaId);
+  if (!idea || idea.campaign_id !== campaignId) throw new Error("Angle not in this project.");
+  const schema = getProjectCopySchema(campaignId);
+  const values = layerCopyToRowValues(schema, {}, {
+    headline: (idea.hooks[0] || idea.theme || "").slice(0, 120),
+    subhead: (idea.promise || idea.insight || idea.angle || "").slice(0, 200),
+    cta: "Learn more",
+    eyebrow: "",
+  });
+  const row = createCopyRow(campaignId, c.brand_id, values, (idea.theme || "Variation").slice(0, 80), idea.id);
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+  revalidatePath(`/campaigns/${campaignId}/agents`);
+  return row.id;
+}
+
+export async function removeIdeaAction(campaignId: string, ideaId: string) {
+  await requireCampaignAccess(campaignId);
+  const idea = getIdea(ideaId);
+  if (!idea || idea.campaign_id !== campaignId) throw new Error("Angle not in this project.");
+  deleteIdea(ideaId);
+  revalidatePath(`/campaigns/${campaignId}/agents`);
 }
 
 export async function signOffProjectAction(campaignId: string) {

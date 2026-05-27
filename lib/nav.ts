@@ -61,7 +61,7 @@ export async function getAppNav(): Promise<AppNav> {
       crumbs.push({ label: idea?.theme || "Idea" });
       crumbs.push({ label: ideaM[2] === "lab" ? "Copy Lab" : "Variations" });
     } else if (pathname.endsWith("/agents")) {
-      crumbs.push({ label: "Agent chain" });
+      crumbs.push({ label: "Ideate" });
     } else if (pathname.includes("/deliverables")) {
       crumbs.push({ label: "Deliverables" });
     } else if (pathname.includes("/copy")) {

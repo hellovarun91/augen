@@ -1,11 +1,11 @@
-import { Badge, Card, Empty, Eyebrow, LinkButton, Section } from "@/components/ui/primitives";
+import { Badge, Card, Empty, Eyebrow, Section } from "@/components/ui/primitives";
 import { listAgentRuns } from "@/lib/agents/persistence";
-import { getBrand, getCampaign, getGeneration, getIdea, listIdeas } from "@/lib/repo";
+import { getBrand, getCampaign, getIdea, listIdeas, ideaIdsWithCopyRows } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { relativeDate } from "@/lib/utils";
-import { AdPreview } from "@/components/ad-preview";
 import { AgentRunControls } from "./controls";
+import { Ideate } from "./ideate";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,11 @@ export default async function AgentChainPage({ params }: { params: Promise<{ id:
   const b = getBrand(c.brand_id);
   if (!b) notFound();
   const ideas = listIdeas(c.id);
+  const promotedIdeaIds = ideaIdsWithCopyRows(c.id);
+  const ideasLite = ideas.map((i) => ({
+    id: i.id, theme: i.theme, insight: i.insight, angle: i.angle,
+    audience: i.audience, promise: i.promise, hooks: i.hooks,
+  }));
   const runs = listAgentRuns({ campaignId: c.id }, 500);
 
   // Group runs by chain
@@ -50,35 +55,39 @@ export default async function AgentChainPage({ params }: { params: Promise<{ id:
     <div className="px-4 py-6 md:px-8 md:py-10 max-w-7xl mx-auto space-y-12">
       <div>
         <Link href={`/campaigns/${c.id}`} className="text-xs text-ink-400 hover:text-ink-100">← {c.name}</Link>
-        <div className="flex items-end justify-between gap-6 mt-2">
-          <div>
-            <Eyebrow>{b.name} · agent chain</Eyebrow>
-            <h1 className="serif text-display-lg mt-1 tracking-tight">Where AI helps, step by step.</h1>
-            <p className="text-ink-300 mt-2 max-w-2xl">
-              Strategist drafts the ideas. Art Director picks the visual direction. Copywriter spins the lines. QC Critic scores every ad with a reason.
-              Every step is rerunnable — pin a winner, replace what feels off, regenerate with a constraint.
-            </p>
+        <Eyebrow className="mt-2">{b.name} · ideate</Eyebrow>
+        <h1 className="serif text-display-lg mt-1 tracking-tight">Ideate</h1>
+        <p className="text-ink-300 mt-2 max-w-2xl">
+          The start of the work — shape <span className="text-ink-100">what</span> to make before you make it. Steer the Strategist,
+          weigh the reasoning behind each angle, and send the ones you believe in to the Copy Sheet as named variations.
+        </p>
+      </div>
+
+      <Ideate campaignId={c.id} ideas={ideasLite} promotedIdeaIds={promotedIdeaIds} />
+
+      <details className="group rounded-xl ring-1 ring-white/10 [&_summary::-webkit-details-marker]:hidden">
+        <summary className="cursor-pointer list-none px-5 py-4 flex items-center justify-between text-sm text-ink-300 hover:text-ink-100">
+          <span>Behind the scenes — the agents, their runs & the direct generate path</span>
+          <span className="text-ink-500 group-open:rotate-180 transition-transform">▾</span>
+        </summary>
+        <div className="px-5 pb-6 pt-1 space-y-10 border-t border-white/5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-5">
+            {(["strategist", "art_director", "copywriter", "critic"] as const).map((k) => (
+              <Card key={k} className="p-5">
+                <Eyebrow>{AGENT_META[k].name}</Eyebrow>
+                <div className="text-3xl font-medium mt-1">{aggStats[k]}</div>
+                <div className="text-xs text-ink-400 mt-2 leading-relaxed">{AGENT_META[k].bullet}</div>
+              </Card>
+            ))}
           </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {(["strategist", "art_director", "copywriter", "critic"] as const).map((k) => (
-          <Card key={k} className="p-5">
-            <Eyebrow>{AGENT_META[k].name}</Eyebrow>
-            <div className="text-3xl font-medium mt-1">{aggStats[k]}</div>
-            <div className="text-xs text-ink-400 mt-2 leading-relaxed">{AGENT_META[k].bullet}</div>
-          </Card>
-        ))}
-      </div>
+          <AgentRunControls campaignId={c.id} ideasCount={ideas.length} />
 
-      <AgentRunControls campaignId={c.id} ideasCount={ideas.length} />
-
-      <Section title="Recent chains" subtitle="Each chain is one Generate Ads run. Scroll a chain to see the agents hand off in order.">
-        {chains.length === 0 ? (
-          <Empty title="No runs yet">Trigger the Strategist or press Generate Ads — the chain will appear here.</Empty>
-        ) : (
-          <div className="space-y-8">
+          <Section title="Recent chains" subtitle="Each chain is one direct Generate Ads run. Scroll a chain to see the agents hand off in order.">
+            {chains.length === 0 ? (
+              <Empty title="No runs yet">Propose angles above, or use the direct generate path — runs appear here.</Empty>
+            ) : (
+              <div className="space-y-8">
             {chains.slice(0, 6).map((chain) => (
               <div key={chain.id} className="space-y-3">
                 <div className="flex items-end justify-between">
@@ -152,8 +161,10 @@ export default async function AgentChainPage({ params }: { params: Promise<{ id:
               </div>
             ))}
           </div>
-        )}
-      </Section>
+            )}
+          </Section>
+        </div>
+      </details>
     </div>
   );
 }

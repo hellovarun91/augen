@@ -265,6 +265,9 @@ function migrate(d: Database.Database) {
   // creative (agentic chain, variations, legacy) not driven by the Copy Sheet.
   try { d.prepare("ALTER TABLE generations ADD COLUMN copy_row_id TEXT").run(); } catch {}
   try { d.prepare("CREATE INDEX IF NOT EXISTS gen_copy_row_idx ON generations(copy_row_id)").run(); } catch {}
+  // Ideate (#48): a copy row promoted from a Strategist angle remembers its source
+  // idea, so the Ideate surface can show which angles are already in the sheet.
+  try { d.prepare("ALTER TABLE copy_rows ADD COLUMN idea_id TEXT").run(); } catch {}
   // Vision QC critic: design score (0-1) + notes from inspecting the rendered pixels
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_score REAL").run(); } catch {}
   try { d.prepare("ALTER TABLE generations ADD COLUMN design_notes TEXT").run(); } catch {}

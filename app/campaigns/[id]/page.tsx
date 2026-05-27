@@ -54,8 +54,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
             <Badge tone={campaign.status === "approved" ? "ok" : campaign.status === "ready_for_review" ? "info" : "neutral"}>
               {campaign.status}
             </Badge>
+            <LinkButton href={`/campaigns/${campaign.id}/agents`} variant="ghost" size="sm">Ideate →</LinkButton>
             <LinkButton href={`/campaigns/${campaign.id}/copy`} variant="ghost" size="sm">Copy Sheet →</LinkButton>
-            <LinkButton href={`/campaigns/${campaign.id}/agents`} variant="ghost" size="sm">Agent chain →</LinkButton>
             <RunCampaignButton campaignId={campaign.id} ideaCount={ideas.length} />
           </div>
         </div>

@@ -678,22 +678,33 @@ export interface CopyRow {
   name: string;
   values: Record<string, string>; status: string; order_idx: number; created_at: number;
   generation_id: string | null;
+  idea_id: string | null;
 }
 
 function hydrateCopyRow(r: any): CopyRow {
-  return { ...r, name: r.name ?? "", values: r.values_json ? JSON.parse(r.values_json) : {}, generation_id: r.generation_id ?? null };
+  return { ...r, name: r.name ?? "", values: r.values_json ? JSON.parse(r.values_json) : {}, generation_id: r.generation_id ?? null, idea_id: r.idea_id ?? null };
 }
 
 export function listCopyRows(campaignId: string): CopyRow[] {
   return (db().prepare("SELECT * FROM copy_rows WHERE campaign_id = ? ORDER BY order_idx ASC, created_at ASC").all(campaignId) as any[]).map(hydrateCopyRow);
 }
 
-export function createCopyRow(campaignId: string, brandId: string, values: Record<string, string> = {}, name = ""): CopyRow {
+export function createCopyRow(campaignId: string, brandId: string, values: Record<string, string> = {}, name = "", ideaId: string | null = null): CopyRow {
   const id = `crow_${nanoid(10)}`;
   const max = db().prepare("SELECT COALESCE(MAX(order_idx), -1) m FROM copy_rows WHERE campaign_id = ?").get(campaignId) as { m: number };
-  db().prepare("INSERT INTO copy_rows (id, campaign_id, brand_id, name, values_json, status, order_idx, created_at) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)")
-    .run(id, campaignId, brandId, name, JSON.stringify(values), max.m + 1, nowMs());
+  db().prepare("INSERT INTO copy_rows (id, campaign_id, brand_id, name, values_json, status, order_idx, created_at, idea_id) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?)")
+    .run(id, campaignId, brandId, name, JSON.stringify(values), max.m + 1, nowMs(), ideaId);
   return hydrateCopyRow(db().prepare("SELECT * FROM copy_rows WHERE id = ?").get(id));
+}
+
+// Idea ids that already have a Copy Sheet row (so Ideate can mark them "added").
+export function ideaIdsWithCopyRows(campaignId: string): string[] {
+  const rows = db().prepare("SELECT DISTINCT idea_id FROM copy_rows WHERE campaign_id = ? AND idea_id IS NOT NULL").all(campaignId) as { idea_id: string }[];
+  return rows.map((r) => r.idea_id);
+}
+
+export function deleteIdea(id: string) {
+  db().prepare("DELETE FROM ideas WHERE id = ?").run(id);
 }
 
 export function updateCopyRow(id: string, patch: { values?: Record<string, string>; status?: string; name?: string }) {
