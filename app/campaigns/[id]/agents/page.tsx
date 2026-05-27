@@ -1,9 +1,10 @@
 import { Badge, Card, Empty, Eyebrow, Section } from "@/components/ui/primitives";
 import { listAgentRuns } from "@/lib/agents/persistence";
-import { getBrand, getCampaign, getIdea, listIdeas, ideaIdsWithCopyRows } from "@/lib/repo";
+import { getBrand, getCampaign, getIdea, listIdeas, ideaIdsWithCopyRows, journeyProgress } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { relativeDate } from "@/lib/utils";
+import { JourneyNav } from "@/components/journey-nav";
 import { AgentRunControls } from "./controls";
 import { Ideate } from "./ideate";
 
@@ -62,6 +63,8 @@ export default async function AgentChainPage({ params }: { params: Promise<{ id:
           weigh the reasoning behind each angle, and send the ones you believe in to the Copy Sheet as named variations.
         </p>
       </div>
+
+      <JourneyNav campaignId={c.id} current="ideate" progress={journeyProgress(c.id)} />
 
       <Ideate campaignId={c.id} ideas={ideasLite} promotedIdeaIds={promotedIdeaIds} />
 

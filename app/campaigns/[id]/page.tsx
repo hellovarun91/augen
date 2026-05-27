@@ -1,5 +1,6 @@
 import { Badge, Card, Empty, Eyebrow, LinkButton, Section } from "@/components/ui/primitives";
-import { getBrand, getCampaign, listCampaignFormats, listGenerationsByCampaign, listIdeas, listComments } from "@/lib/repo";
+import { getBrand, getCampaign, listCampaignFormats, listGenerationsByCampaign, listIdeas, listComments, journeyProgress } from "@/lib/repo";
+import { JourneyNav } from "@/components/journey-nav";
 import { listMembershipsForBrand } from "@/lib/users";
 import { getSession } from "@/lib/session";
 import { ALL_FORMATS, formatBySlug, formatsByPlatform } from "@/lib/formats";
@@ -54,12 +55,12 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
             <Badge tone={campaign.status === "approved" ? "ok" : campaign.status === "ready_for_review" ? "info" : "neutral"}>
               {campaign.status}
             </Badge>
-            <LinkButton href={`/campaigns/${campaign.id}/agents`} variant="ghost" size="sm">Ideate →</LinkButton>
-            <LinkButton href={`/campaigns/${campaign.id}/copy`} variant="ghost" size="sm">Copy Sheet →</LinkButton>
             <RunCampaignButton campaignId={campaign.id} ideaCount={ideas.length} />
           </div>
         </div>
       </header>
+
+      <JourneyNav campaignId={campaign.id} current="overview" progress={journeyProgress(campaign.id)} />
 
       {campaign.status === "generating" && (
         <div className="rounded-xl ring-1 ring-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm text-amber-100 flex items-center gap-2.5">

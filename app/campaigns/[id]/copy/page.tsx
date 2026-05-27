@@ -1,7 +1,8 @@
-import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign, listDesignsByRow } from "@/lib/repo";
+import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign, listDesignsByRow, journeyProgress } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
+import { JourneyNav } from "@/components/journey-nav";
 import { CopySheet } from "./sheet";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,8 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
           each <span className="text-ink-100">column is a layer</span> of the artwork. Formats are set in the project brief — a row renders in each of them.
         </p>
       </div>
+
+      <JourneyNav campaignId={campaign.id} current="copy" progress={journeyProgress(campaign.id)} />
 
       <CopySheet campaignId={campaign.id} slug={brand.slug} schema={schema} initialRows={rows} initialDesigns={initialDesigns} />
     </div>

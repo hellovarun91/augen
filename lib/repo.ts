@@ -349,9 +349,29 @@ export function applyCopyToRowSiblings(genId: string): number {
 }
 
 // A design ships only when its row's copy is approved AND its own visual is
-// approved AND it isn't stale. The predicate the Deliverables gate (#50) uses.
-export function designReady(d: { status: string; stale?: number | null }, rowApproved: boolean): boolean {
-  return rowApproved && d.status === "approved" && !d.stale;
+// approved AND it isn't stale. Standalone creatives (no row) ship on visual
+// approval alone. The predicate the Deliverables gate (#50) uses.
+export function designReady(d: { status: string; stale?: number | null; copy_row_id?: string | null }, rowApproved: boolean): boolean {
+  if (d.status !== "approved" || d.stale) return false;
+  return d.copy_row_id ? rowApproved : true;
+}
+
+// Designs that are cleared to ship — the Deliverables gate (#50).
+export function listReadyDesigns(campaignId: string): Generation[] {
+  const approvedRow = new Map<string, boolean>();
+  for (const r of listCopyRows(campaignId)) approvedRow.set(r.id, r.status === "approved");
+  return listGenerationsByCampaign(campaignId).filter((g) =>
+    designReady(g, g.copy_row_id ? approvedRow.get(g.copy_row_id) === true : true));
+}
+
+// Progress signals for the journey stepper (#50): how far the project has come.
+export function journeyProgress(campaignId: string): { ideas: number; rows: number; designs: number; ready: number } {
+  return {
+    ideas: listIdeas(campaignId).length,
+    rows: listCopyRows(campaignId).length,
+    designs: listGenerationsByCampaign(campaignId).filter((g) => g.copy_row_id).length,
+    ready: listReadyDesigns(campaignId).length,
+  };
 }
 
 export function getGeneration(id: string): Generation | null {
