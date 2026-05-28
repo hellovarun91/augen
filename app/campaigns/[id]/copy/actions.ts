@@ -8,7 +8,9 @@ import { generateDesignsForRow, generateDesignsForCampaign } from "@/lib/copy-fa
 import { rewriteCellCopy, type RewriteAction, type Layer } from "@/lib/agents/copy-rewrite";
 import { reviewRowCopy } from "@/lib/agents/copy-critic";
 import { getBrand, createReference } from "@/lib/repo";
-import { saveUploadedImage } from "@/lib/images/providers";
+import { saveUploadedImage, pexelsList, downloadImageBytes, generateImage } from "@/lib/images/providers";
+import { recordSpend } from "@/lib/spend";
+import { imagePriceMicros } from "@/lib/agents/pricing";
 import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
 import { requireCampaignAccess } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
@@ -221,6 +223,70 @@ export async function uploadRowImageAction(campaignId: string, rowId: string, co
   markRowDesignsStale(rowId);
   revalidatePath(`/campaigns/${campaignId}/copy`);
   return { refId: ref.id, filePath: ref.file_path, label: ref.label };
+}
+
+// ---------- #57: media v2 — Stock (Pexels) + Generate (Gemini) ----------
+
+// Search Pexels for stock photos. Returns metadata + thumb/full URLs; the
+// chosen one is downloaded + saved by pickStockAction below.
+export async function searchStockAction(campaignId: string, query: string) {
+  await requireCampaignAccess(campaignId);
+  const q = query.trim();
+  if (!q) return [];
+  return pexelsList(q, { limit: 12 });
+}
+
+// Persist a chosen Pexels photo as a brand reference + set the row's image cell.
+export async function pickStockAction(campaignId: string, rowId: string, columnKey: string, photo: { fullUrl: string; alt?: string; photographer?: string; width?: number; height?: number }) {
+  const { campaign: c } = await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  const brand = getBrand(c.brand_id);
+  if (!brand) throw new Error("Brand missing.");
+  if (!photo?.fullUrl) throw new Error("No photo to pick.");
+  const dl = await downloadImageBytes(photo.fullUrl);
+  if (!dl) throw new Error("Couldn't download the photo.");
+  const saved = await saveUploadedImage(brand.slug, { name: `pexels-${Date.now()}.jpg`, mime: dl.mime || "image/jpeg", bytes: dl.bytes });
+  const ref = createReference({
+    brandId: brand.id, kind: "stock", source: "pexels",
+    label: `${photo.alt || row.name || "Stock"} · ${photo.photographer || "Pexels"}`,
+    filePath: saved.publicPath, mime: saved.mime, width: photo.width, height: photo.height,
+    tags: ["sheet", "row-image", "pexels"],
+  });
+  const next = { ...row.values, [columnKey]: ref.id };
+  updateCopyRow(rowId, { values: next });
+  markRowDesignsStale(rowId);
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+  return { refId: ref.id };
+}
+
+// Generate an image via Gemini (the #52 editorial-photography lock is in the
+// providers boilerplate), persist as a reference, attach to the row's image cell.
+const GENERATE_PROMPT_MAX = 800;
+export async function generateMediaAction(campaignId: string, rowId: string, columnKey: string, prompt: string, aspect: string = "4:5") {
+  const { user, campaign: c } = await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  const brand = getBrand(c.brand_id);
+  if (!brand) throw new Error("Brand missing.");
+  const text = (prompt || "").trim().slice(0, GENERATE_PROMPT_MAX);
+  if (!text) throw new Error("Add a short prompt to generate.");
+  const result = await generateImage(text, aspect);
+  if (!result) throw new Error("Image generation unavailable (set GEMINI_API_KEY or check the model chain).");
+  const saved = await saveUploadedImage(brand.slug, { name: `gen-${Date.now()}.png`, mime: result.mime, bytes: result.bytes });
+  const ref = createReference({
+    brandId: brand.id, kind: "generated", source: "gemini",
+    label: `${row.name || "Row"} · generated · ${aspect}`,
+    prompt: text, filePath: saved.publicPath, mime: saved.mime, width: result.width, height: result.height,
+    tags: ["sheet", "row-image", "gemini", aspect],
+  });
+  recordSpend({
+    userId: user.id, brandId: brand.id, campaignId,
+    provider: "gemini", category: "image", model: result.source, qty: 1, costMicros: imagePriceMicros(),
+  });
+  const next = { ...row.values, [columnKey]: ref.id };
+  updateCopyRow(rowId, { values: next });
+  markRowDesignsStale(rowId);
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+  return { refId: ref.id };
 }
 
 // Approve & send to design in one step: mark approved, then push if linked.

@@ -1,7 +1,10 @@
 "use client";
 import { useState, useRef, useEffect, useTransition } from "react";
 import { Button } from "@/components/ui/primitives";
-import { setRowImageAction, uploadRowImageAction } from "./actions";
+import { setRowImageAction, uploadRowImageAction, searchStockAction, pickStockAction, generateMediaAction } from "./actions";
+
+interface StockHit { id: number; alt: string; photographer: string; thumbUrl: string; fullUrl: string; width: number; height: number }
+type Tab = "library" | "upload" | "stock" | "generate";
 
 export interface ReferenceLite { id: string; label: string | null; file_path: string | null; mime: string | null; kind: string }
 
@@ -16,9 +19,15 @@ export function MediaCell({ campaignId, rowId, columnKey, value, references, onC
 }) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"library" | "upload">("library");
+  const [tab, setTab] = useState<Tab>("library");
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  // Stock tab
+  const [stockQuery, setStockQuery] = useState("");
+  const [stockResults, setStockResults] = useState<StockHit[]>([]);
+  const [stockSearched, setStockSearched] = useState(false);
+  // Generate tab
+  const [prompt, setPrompt] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +59,30 @@ export function MediaCell({ campaignId, rowId, columnKey, value, references, onC
     });
   }
 
+  function searchStock() {
+    setErr(null); setStockSearched(false);
+    start(async () => {
+      try { const hits = await searchStockAction(campaignId, stockQuery); setStockResults(hits); setStockSearched(true); }
+      catch (e: any) { setErr(e?.message || "Search failed"); }
+    });
+  }
+  function pickStock(p: StockHit) {
+    setErr(null);
+    start(async () => {
+      try {
+        const res = await pickStockAction(campaignId, rowId, columnKey, { fullUrl: p.fullUrl, alt: p.alt, photographer: p.photographer, width: p.width, height: p.height });
+        onChange(res.refId); setOpen(false);
+      } catch (e: any) { setErr(e?.message || "Couldn't add stock photo"); }
+    });
+  }
+  function runGenerate() {
+    setErr(null);
+    start(async () => {
+      try { const res = await generateMediaAction(campaignId, rowId, columnKey, prompt); onChange(res.refId); setOpen(false); }
+      catch (e: any) { setErr(e?.message || "Generation failed"); }
+    });
+  }
+
   return (
     <div ref={boxRef} className="relative">
       {current && current.file_path ? (
@@ -71,18 +104,18 @@ export function MediaCell({ campaignId, rowId, columnKey, value, references, onC
       {open && (
         <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 rounded-lg ring-1 ring-white/10 bg-ink-900 shadow-2xl w-[280px]">
           <div className="flex border-b border-white/5">
-            {(["library", "upload"] as const).map((t) => (
+            {(["library", "upload", "stock", "generate"] as const).map((t) => (
               <button key={t} onClick={() => setTab(t)}
-                className={"flex-1 text-xs py-2 transition-colors " + (tab === t ? "text-ink-100 bg-white/5" : "text-ink-400 hover:text-ink-200")}>
-                {t === "library" ? "Library" : "Upload"}
+                className={"flex-1 text-[11px] py-2 transition-colors " + (tab === t ? "text-ink-100 bg-white/5" : "text-ink-400 hover:text-ink-200")}>
+                {t === "library" ? "Library" : t === "upload" ? "Upload" : t === "stock" ? "Stock" : "Generate"}
               </button>
             ))}
           </div>
 
-          {tab === "library" ? (
+          {tab === "library" && (
             <div className="p-2 max-h-64 overflow-y-auto">
               {references.length === 0 ? (
-                <div className="text-[11px] text-ink-500 px-2 py-6 text-center">No brand assets yet — upload one, or add Pexels references on the brand.</div>
+                <div className="text-[11px] text-ink-500 px-2 py-6 text-center">No brand assets yet — upload one, search stock, or generate.</div>
               ) : (
                 <div className="grid grid-cols-3 gap-1.5">
                   {references.map((r) => (
@@ -98,7 +131,9 @@ export function MediaCell({ campaignId, rowId, columnKey, value, references, onC
                 </div>
               )}
             </div>
-          ) : (
+          )}
+
+          {tab === "upload" && (
             <form className="p-3 space-y-2" action={(fd) => onUpload(fd)}>
               <input name="file" type="file" accept="image/*" required
                 className="block w-full text-[11px] text-ink-300 file:mr-2 file:rounded-full file:border-0 file:bg-ink-700 file:text-ink-50 file:text-[11px] file:px-3 file:py-1 hover:file:bg-ink-600" />
@@ -107,6 +142,52 @@ export function MediaCell({ campaignId, rowId, columnKey, value, references, onC
                 <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-ink-400 hover:text-white">Cancel</button>
               </div>
             </form>
+          )}
+
+          {tab === "stock" && (
+            <div className="p-2 space-y-2">
+              <div className="flex gap-1.5">
+                <input value={stockQuery} onChange={(e) => setStockQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); searchStock(); } }}
+                  placeholder="Search Pexels"
+                  className="flex-1 rounded-md bg-ink-800 px-2.5 py-1.5 text-xs ring-1 ring-inset ring-white/10 focus:ring-white/25" />
+                <Button size="sm" variant="secondary" onClick={searchStock} disabled={pending || !stockQuery.trim()}>Go</Button>
+              </div>
+              <div className="max-h-56 overflow-y-auto">
+                {!stockSearched && stockResults.length === 0 && (
+                  <div className="text-[11px] text-ink-500 px-2 py-5 text-center">Pexels stock — type a query and Go.</div>
+                )}
+                {stockSearched && stockResults.length === 0 && (
+                  <div className="text-[11px] text-ink-500 px-2 py-5 text-center">No results — try another query.</div>
+                )}
+                {stockResults.length > 0 && (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {stockResults.map((p) => (
+                      <button key={p.id} onClick={() => pickStock(p)} disabled={pending}
+                        title={`${p.alt || "photo"} · ${p.photographer}`}
+                        className="block aspect-square rounded-md ring-1 ring-white/10 hover:ring-white/30 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.thumbUrl} alt={p.alt || ""} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === "generate" && (
+            <div className="p-3 space-y-2">
+              <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)}
+                placeholder="A close-up of hands at a laptop, soft morning light…"
+                rows={3}
+                className="block w-full rounded-md bg-ink-800 px-2.5 py-1.5 text-xs ring-1 ring-inset ring-white/10 focus:ring-white/25 resize-none placeholder:text-ink-600" />
+              <div className="text-[10px] text-ink-500 leading-snug">Editorial photography is baked in — describe subject, environment, light. Generates a 4:5 image saved to this brand.</div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" onClick={runGenerate} disabled={pending || !prompt.trim()}>{pending ? "Generating…" : "Generate"}</Button>
+                <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-ink-400 hover:text-white">Cancel</button>
+              </div>
+            </div>
           )}
 
           {err && <div className="px-3 py-2 text-[10px] text-rose-300 border-t border-white/5">{err}</div>}

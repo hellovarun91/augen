@@ -39,6 +39,51 @@ export interface StockResult {
   height: number;
 }
 
+// List Pexels search results (no bytes yet — for an in-app picker). Returns
+// thumbnail + full URLs so the client can show options and the server can
+// download the chosen one in pickStockAction (#57).
+export interface PexelsPhoto {
+  id: number;
+  alt: string;
+  photographer: string;
+  thumbUrl: string;
+  fullUrl: string;
+  width: number;
+  height: number;
+}
+
+export async function pexelsList(query: string, opts: { limit?: number; orientation?: "landscape" | "portrait" | "square" } = {}): Promise<PexelsPhoto[]> {
+  const key = process.env.PEXELS_API_KEY;
+  if (!key) return [];
+  const params = new URLSearchParams({ query: query.trim(), per_page: String(Math.min(Math.max(opts.limit || 12, 1), 30)) });
+  if (opts.orientation) params.set("orientation", opts.orientation);
+  const r = await fetch(`https://api.pexels.com/v1/search?${params}`, { headers: { Authorization: key } });
+  if (!r.ok) return [];
+  const j: any = await r.json();
+  const photos: any[] = Array.isArray(j?.photos) ? j.photos : [];
+  return photos.map((p) => ({
+    id: p.id,
+    alt: p.alt || "",
+    photographer: p.photographer || "Pexels",
+    thumbUrl: p.src?.medium || p.src?.small || p.src?.tiny || "",
+    fullUrl: p.src?.large2x || p.src?.large || p.src?.original || "",
+    width: p.width || 1200,
+    height: p.height || 800,
+  })).filter((p) => p.thumbUrl && p.fullUrl);
+}
+
+// Download bytes from any image URL — used to persist a chosen stock photo or
+// a generated image into the brand's references.
+export async function downloadImageBytes(url: string): Promise<{ bytes: Buffer; mime: string } | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const ab = await r.arrayBuffer();
+    const mime = r.headers.get("content-type") || "image/jpeg";
+    return { bytes: Buffer.from(ab), mime };
+  } catch { return null; }
+}
+
 export async function searchStock(query: string, orientation: "landscape" | "portrait" | "square" = "landscape"): Promise<StockResult | null> {
   const key = process.env.PEXELS_API_KEY;
   if (!key) return null;
