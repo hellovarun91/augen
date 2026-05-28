@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ReviewControls } from "./controls";
 import { EditPanel } from "./edit-panel";
+import { LiveCopyEditor } from "./live-copy";
 import { AdOverrides } from "@/lib/composer/overrides";
 import type { BrandTokens } from "@/lib/types";
 
@@ -58,15 +59,12 @@ export function AdDetailClient({
           </div>
         </Card>
 
-        <Card className="p-5">
-          <Eyebrow>Copy (current)</Eyebrow>
-          <div className="serif text-2xl mt-2 whitespace-pre-line tracking-tight">{generation.headline}</div>
-          {generation.subhead && <p className="text-ink-200 mt-2 text-sm">{generation.subhead}</p>}
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-xs text-ink-400">CTA</div>
-            <div className="text-sm text-ink-100">{generation.cta} →</div>
-          </div>
-        </Card>
+        <LiveCopyEditor
+          generationId={generation.id}
+          initial={{ eyebrow: generation.eyebrow, headline: generation.headline, subhead: generation.subhead, cta: generation.cta }}
+          fonts={{ display: tokens.fonts.display, body: tokens.fonts.body }}
+          onReload={onReload}
+        />
 
         {generation.imagePrompt && (
           <Card className="p-5 space-y-3">
@@ -94,7 +92,6 @@ export function AdDetailClient({
             <ReviewControls
               generationId={generation.id}
               status={generation.status}
-              initial={{ headline: generation.headline, subhead: generation.subhead, cta: generation.cta, eyebrow: generation.eyebrow }}
               isWinner={generation.isWinner}
             />
             {ideaSummary && (
