@@ -6,8 +6,8 @@
   "ui": "ui.html",
   "editorType": ["figma"],
   "networkAccess": {
-    "allowedDomains": ["*"],
+    "allowedDomains": ["https://web-production-9666a.up.railway.app"],
     "devAllowedDomains": ["http://localhost:3000"],
-    "reasoning": "Fetches your Augen creatives + their rendered previews and posts copy edits back to your Augen instance. Lock this to your own Augen domain before sharing the plugin."
+    "reasoning": "Fetches your Augen creatives + their rendered previews and posts copy edits back to your Augen instance. If you self-host Augen on a different domain, add it here."
   }
 }
