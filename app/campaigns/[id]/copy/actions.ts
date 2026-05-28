@@ -5,6 +5,8 @@ import {
   listDesignsForRow, listCopyRows, markRowDesignsStale,
 } from "@/lib/repo";
 import { generateDesignsForRow, generateDesignsForCampaign } from "@/lib/copy-fanout";
+import { rewriteCellCopy, type RewriteAction, type Layer } from "@/lib/agents/copy-rewrite";
+import { getBrand } from "@/lib/repo";
 import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
 import { requireCampaignAccess } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
@@ -134,6 +136,32 @@ export async function pushToCreativeAction(campaignId: string, rowId: string) {
   updateGenerationCopy(row.generation_id, copy);
   revalidatePath(`/campaigns/${campaignId}/copy`);
   revalidatePath(`/ads/${row.generation_id}`);
+}
+
+// ---------- #54 v1: in-cell copy AI quick actions ----------
+// Rewrite ONE cell of the row in place. The row's other cells are passed as
+// context to the rewriter, but only this cell's value changes. Returns the
+// proposed text + a brief rationale; the client shows a diff to accept/reject.
+const REWRITE_ACTIONS = new Set<RewriteAction>(["punchier", "shorter", "match_voice"]);
+export async function rewriteCellAction(campaignId: string, rowId: string, columnKey: string, action: string) {
+  const { campaign: c } = await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  if (!REWRITE_ACTIONS.has(action as RewriteAction)) throw new Error("Unknown action.");
+  const schema = getProjectCopySchema(campaignId);
+  const col = schema.columns.find((x) => x.key === columnKey);
+  if (!col) throw new Error("Column not in this project.");
+  const brand = getBrand(c.brand_id);
+  if (!brand) throw new Error("Brand missing.");
+  const layer: Layer = (col.layer && col.layer !== "none" ? col.layer : "other") as Layer;
+  const context = rowToLayerCopy(schema, row.values);
+  return rewriteCellCopy({
+    brand,
+    layer,
+    currentText: row.values[columnKey] || "",
+    action: action as RewriteAction,
+    maxChars: col.maxChars,
+    context: { ...context, rowName: row.name || undefined },
+  });
 }
 
 // Approve & send to design in one step: mark approved, then push if linked.

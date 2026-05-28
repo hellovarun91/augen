@@ -8,30 +8,100 @@ import type { CopyRow } from "@/lib/repo";
 import {
   addRowAction, updateRowAction, deleteRowAction, saveColumnsAction,
   setRowStatusAction, setRowNameAction, generateDesignsAction, generateAllDesignsAction,
+  rewriteCellAction,
 } from "./actions";
 
+type RewriteAction = "punchier" | "shorter" | "match_voice";
+type RewriteResult = { proposed: string; rationale: string };
+
 // A copy cell: blends into the grid, rings on interaction, auto-grows to its
-// content, and only shows a counter as you approach the limit.
-function CellBox({ value, maxChars, onChange, onBlur }: { value: string; maxChars?: number; onChange: (v: string) => void; onBlur: () => void }) {
+// content, only shows a counter as you approach the limit, and — when an
+// `onRewrite` handler is provided — surfaces a ✨ AI quick-rewrite menu (#54).
+function CellBox({ value, maxChars, onChange, onBlur, onRewrite }: {
+  value: string; maxChars?: number; onChange: (v: string) => void; onBlur: () => void;
+  onRewrite?: (action: RewriteAction) => Promise<RewriteResult>;
+}) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [busy, setBusy] = useState<RewriteAction | null>(null);
+  const [suggestion, setSuggestion] = useState<RewriteResult | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
   useEffect(() => {
     const t = ref.current; if (!t) return;
     t.style.height = "auto"; t.style.height = `${t.scrollHeight}px`;
   }, [value]);
+
+  // Outside-click closes the menu — keeps the cell quiet when you move on.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setMenuOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
+
   const near = !!maxChars && value.length >= maxChars * 0.85;
   const over = !!maxChars && value.length > maxChars;
+
+  async function rewrite(action: RewriteAction) {
+    if (!onRewrite) return;
+    setMenuOpen(false); setErr(null); setBusy(action); setSuggestion(null);
+    try { setSuggestion(await onRewrite(action)); }
+    catch (e: any) { setErr(e?.message || "Couldn't rewrite"); }
+    finally { setBusy(null); }
+  }
+  function accept() {
+    if (!suggestion) return;
+    onChange(suggestion.proposed);
+    setSuggestion(null);
+    // Let state propagate before triggering commit on the new value.
+    setTimeout(onBlur, 0);
+  }
+
   return (
-    <div className="relative">
+    <div ref={boxRef} className="relative group">
       <textarea
         ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         rows={1}
-        className={"block w-full resize-none bg-transparent rounded-md px-2 py-1.5 pr-8 text-sm leading-snug text-ink-100 ring-1 ring-inset focus:ring-white/25 " + (over ? "ring-rose-500/40" : "ring-transparent hover:ring-white/10")}
+        className={"block w-full resize-none bg-transparent rounded-md px-2 py-1.5 pr-9 text-sm leading-snug text-ink-100 ring-1 ring-inset focus:ring-white/25 " + (over ? "ring-rose-500/40" : "ring-transparent hover:ring-white/10")}
         placeholder="—"
       />
-      {near && <span className={"pointer-events-none absolute bottom-1 right-1.5 text-[10px] " + (over ? "text-rose-300" : "text-ink-500")}>{value.length}/{maxChars}</span>}
+      {near && !suggestion && (
+        <span className={"pointer-events-none absolute bottom-1 right-1.5 text-[10px] " + (over ? "text-rose-300" : "text-ink-500")}>{value.length}/{maxChars}</span>
+      )}
+
+      {onRewrite && !busy && (
+        <button type="button" title="Rewrite with AI" onClick={() => setMenuOpen((v) => !v)}
+          className={"absolute top-1 right-1 text-[10px] rounded px-1.5 py-0.5 transition-opacity " +
+            (menuOpen ? "opacity-100 bg-indigo-400/20 text-indigo-100 ring-1 ring-indigo-400/30" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 text-ink-400 hover:bg-white/10 hover:text-ink-100")}>✨</button>
+      )}
+      {busy && <span className="absolute top-1 right-1 text-[10px] text-indigo-200">…</span>}
+
+      {menuOpen && (
+        <div className="absolute top-7 right-0 z-20 rounded-lg ring-1 ring-white/10 bg-ink-800 shadow-xl py-1 w-44">
+          {([["punchier", "Punchier"], ["shorter", "Shorter"], ["match_voice", "Match brand voice"]] as const).map(([k, label]) => (
+            <button key={k} type="button" onClick={() => rewrite(k)} className="w-full text-left text-xs px-3 py-1.5 hover:bg-white/5 text-ink-200">
+              ✨ {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {suggestion && (
+        <div className="mt-1.5 rounded-md ring-1 ring-indigo-400/30 bg-indigo-400/5 p-2 text-xs space-y-1.5">
+          <div className="text-ink-100 leading-snug whitespace-pre-wrap">{suggestion.proposed || "—"}</div>
+          {suggestion.rationale && <div className="text-[10px] text-ink-400 italic">{suggestion.rationale}</div>}
+          <div className="flex items-center gap-2 pt-0.5">
+            <button type="button" onClick={accept} className="text-[11px] rounded px-2 py-0.5 bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30 hover:bg-emerald-400/20">Accept</button>
+            <button type="button" onClick={() => setSuggestion(null)} className="text-[11px] text-ink-400 hover:text-rose-300">Reject</button>
+          </div>
+        </div>
+      )}
+      {err && <div className="text-[10px] text-rose-300 mt-1">{err}</div>}
     </div>
   );
 }
@@ -215,7 +285,13 @@ export function CopySheet({ campaignId, slug, schema, initialRows, initialDesign
                   </td>
                   {columns.map((c) => (
                     <td key={c.key} className="px-1.5 py-1.5 border-l border-white/5 align-top">
-                      <CellBox value={r.values[c.key] || ""} maxChars={c.maxChars} onChange={(val) => setCell(r.id, c.key, val)} onBlur={() => commit(r.id)} />
+                      <CellBox
+                        value={r.values[c.key] || ""}
+                        maxChars={c.maxChars}
+                        onChange={(val) => setCell(r.id, c.key, val)}
+                        onBlur={() => commit(r.id)}
+                        onRewrite={(action) => rewriteCellAction(campaignId, r.id, c.key, action)}
+                      />
                     </td>
                   ))}
                   <td className="px-3 py-2 border-l border-white/5 align-top">
