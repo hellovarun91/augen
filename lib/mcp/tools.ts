@@ -5,11 +5,13 @@ import {
   getBrandBySlug, listBrandsForUser, listCampaignsByBrand, getCampaign,
   listGenerationsByCampaign, getGeneration, createBrand, createCampaign,
   updateGenerationStatus, updateGenerationCopy, hasBrandAccess, getBrand,
-  updateBrandTokens, renameCampaign, deleteCampaign, signOffCampaign, listIdeas,
+  updateBrandTokens, renameCampaign, deleteCampaign, signOffCampaign, listIdeas, getIdea,
   setGenerationWinner, getGenerationOverrides, updateGenerationOverrides,
-  listAssets, createAsset, listReferences, createReference,
+  listAssets, createAsset, listReferences, createReference, getReference,
   listExternalWinners, createExternalWinner,
-  getProjectCopySchema, listCopyRows, getCopyRow, updateCopyRow, linkCopyRow,
+  getProjectCopySchema, listCopyRows, getCopyRow, createCopyRow, updateCopyRow, deleteCopyRow,
+  listDesignsForRow, listReadyDesigns, applyCopyToRowSiblings, markRowDesignsStale,
+  updateGenerationReference, getProjectSizes,
   listComments, createComment, listReviews, recordVisionReview,
   brandRole, deleteBrand,
 } from "@/lib/repo";
@@ -21,7 +23,10 @@ import { refineBrandAI } from "@/lib/ai/brand-refine";
 import { foundationStrength } from "@/lib/brand-strength";
 import { runVisionCritic } from "@/lib/agents/vision-critic";
 import { parseOverrides, mergeOverrides } from "@/lib/composer/overrides";
-import { rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
+import { rowToLayerCopy, layerCopyToRowValues, isMediaColumn } from "@/lib/copy-schema";
+import { generateDesignsForRow, generateDesignsForCampaign } from "@/lib/copy-fanout";
+import { rewriteCellCopy, type RewriteAction } from "@/lib/agents/copy-rewrite";
+import { reviewRowCopy } from "@/lib/agents/copy-critic";
 import { searchStock, generateImage, saveBytes } from "@/lib/images/providers";
 import { spendByBrand } from "@/lib/spend";
 import { defaultFormatSlugs } from "@/lib/formats";
@@ -56,8 +61,9 @@ export const TOOL_DEFS: McpTool[] = [
 
   // ---- Ideas + generation ----
   { name: "list_ideas", description: "List a project's idea seeds.", inputSchema: { type: "object", properties: { project: s("Project id.") }, required: ["project"] } },
-  { name: "seed_ideas", description: "Generate idea seeds for a project (runs the Strategist). Needed before generate_ads.", inputSchema: { type: "object", properties: { project: s("Project id."), count: n("1-8, default 4"), notes: s("Optional steer.") }, required: ["project"] } },
-  { name: "generate_ads", description: "Run the agentic chain to generate ads for a project. Costs real AI/image spend; rate-limited.", inputSchema: { type: "object", properties: { project: s("Project id.") }, required: ["project"] } },
+  { name: "seed_ideas", description: "Generate idea seeds for a project (runs the Strategist).", inputSchema: { type: "object", properties: { project: s("Project id."), count: n("1-8, default 4"), notes: s("Optional steer.") }, required: ["project"] } },
+  { name: "add_idea_to_copy_sheet", description: "Promote a Strategist idea into a named Copy Sheet row (hook → headline, promise → subhead). The recommended way to seed rows.", inputSchema: { type: "object", properties: { idea: s("Idea id.") }, required: ["idea"] } },
+  { name: "generate_ads", description: "Run the agentic chain to generate ads for a project (legacy path; new flow is rows × fan-out — see generate_designs_for_row).", inputSchema: { type: "object", properties: { project: s("Project id.") }, required: ["project"] } },
 
   // ---- Creatives (incl. visual loop) ----
   { name: "list_creatives", description: "List creatives for a project or brand, with copy-QC + design scores.", inputSchema: { type: "object", properties: { project: s("Project id."), brand: s("Brand slug.") } } },
@@ -68,13 +74,25 @@ export const TOOL_DEFS: McpTool[] = [
   { name: "edit_creative", description: "Apply design overrides to a creative (then re-render to see the change).", inputSchema: { type: "object", properties: { id: s("Creative id."), headlineScale: n("0.5-1.6"), ctaPosition: s("auto|top-right|bottom-right|bottom-left|inline-right"), scrimOpacity: n("0-1, darkens text backdrop"), headlineYShift: n("-0.3..0.3"), imageFilter: s("none|grayscale|warm|cool|dark|light"), headlineColor: s("hex") }, required: ["id"] } },
   { name: "set_creative_status", description: "Approve, reject, or request revision on a creative.", inputSchema: { type: "object", properties: { id: s("Creative id."), status: { type: "string", enum: ["approved", "rejected", "needs_revision"] }, note: s("") }, required: ["id", "status"] } },
   { name: "mark_winner", description: "Mark/unmark a creative as a winner (feeds the agents' learning loop).", inputSchema: { type: "object", properties: { id: s("Creative id."), on: { type: "boolean", description: "default true" } }, required: ["id"] } },
+  { name: "list_ready_designs", description: "Designs cleared to ship — row copy approved AND design approved AND not stale. The Deliverables gate.", inputSchema: { type: "object", properties: { project: s("Project id.") }, required: ["project"] } },
+  { name: "apply_copy_to_siblings", description: "Push this design's copy onto the row's other sizes (so all siblings match). They land needing a re-look but no longer stale.", inputSchema: { type: "object", properties: { id: s("Creative id.") }, required: ["id"] } },
 
   // ---- Copy Sheet ----
-  { name: "list_copy_rows", description: "List a project's Copy Sheet rows (status + values).", inputSchema: { type: "object", properties: { project: s("Project id.") }, required: ["project"] } },
-  { name: "set_copy_row_status", description: "Set a copy row's status: draft | proof | approved.", inputSchema: { type: "object", properties: { row: s("Copy row id."), status: { type: "string", enum: ["draft", "proof", "approved"] } }, required: ["row", "status"] } },
-  { name: "link_copy_row", description: "Link a copy row to a creative (so it can drive that creative's copy).", inputSchema: { type: "object", properties: { row: s("Copy row id."), creative: s("Creative id.") }, required: ["row", "creative"] } },
-  { name: "push_row_to_creative", description: "Push a copy row's copy onto its linked creative.", inputSchema: { type: "object", properties: { row: s("Copy row id.") }, required: ["row"] } },
-  { name: "pull_row_from_creative", description: "Pull the linked creative's current copy into the copy row.", inputSchema: { type: "object", properties: { row: s("Copy row id.") }, required: ["row"] } },
+  // The sheet is the production tool. Rows are copy variations; columns are layers
+  // (headline, subhead, cta, eyebrow, plus brand-custom). Every row fans out to all
+  // project formats via generate_designs_for_row.
+  { name: "get_project_schema", description: "The project's Copy Sheet columns (layers) + size set (formats every row renders in). Read this before filling cells.", inputSchema: { type: "object", properties: { project: s("Project id.") }, required: ["project"] } },
+  { name: "list_copy_rows", description: "List a project's Copy Sheet rows (name, status, values, designs count).", inputSchema: { type: "object", properties: { project: s("Project id.") }, required: ["project"] } },
+  { name: "add_copy_row", description: "Add a new empty row to the Copy Sheet. Returns the row id.", inputSchema: { type: "object", properties: { project: s("Project id."), name: s("Variation name (e.g. \"India · festive offer\").") }, required: ["project"] } },
+  { name: "set_copy_row_name", description: "Rename a copy row (this also names the designs it generates).", inputSchema: { type: "object", properties: { row: s("Copy row id."), name: s("New name.") }, required: ["row", "name"] } },
+  { name: "update_copy_row_cells", description: "Update a row's cells. Pass a map { columnKey: value } — call get_project_schema to see the keys. Triggers the stale rule on the row's designs.", inputSchema: { type: "object", properties: { row: s("Copy row id."), cells: { type: "object", description: "Map of columnKey → cell value.", additionalProperties: { type: "string" } } }, required: ["row", "cells"] } },
+  { name: "set_copy_row_status", description: "Set a copy row's copy-approval status: draft | proof | approved. \"approved\" is one half of the Deliverables gate.", inputSchema: { type: "object", properties: { row: s("Copy row id."), status: { type: "string", enum: ["draft", "proof", "approved"] } }, required: ["row", "status"] } },
+  { name: "delete_copy_row", description: "Delete a row (and its fan-out designs).", inputSchema: { type: "object", properties: { row: s("Copy row id.") }, required: ["row"] } },
+  { name: "set_row_image", description: "Attach a brand reference image to a row's image cell (use a refId from list_references / add_stock_reference / generate_reference). Pass null to clear. Triggers the stale rule.", inputSchema: { type: "object", properties: { row: s("Copy row id."), column: s("Image column key (find via get_project_schema)."), reference: s("Reference id, or null to clear.") }, required: ["row", "column"] } },
+  { name: "rewrite_cell", description: "Quick AI rewrite of one cell. The row's other cells + brand voice are passed as context. Returns the proposed text (the client picks Accept/Reject — this tool does NOT mutate).", inputSchema: { type: "object", properties: { row: s("Copy row id."), column: s("Column key."), action: { type: "string", enum: ["punchier", "shorter", "match_voice"] } }, required: ["row", "column", "action"] } },
+  { name: "review_row_copy", description: "Critic on the row's copy: score (0..1) + one-line fix + optional concrete single-layer rewrite. Returns the review — doesn't apply it.", inputSchema: { type: "object", properties: { row: s("Copy row id.") }, required: ["row"] } },
+  { name: "generate_designs_for_row", description: "Fan one row out across the project's formats — same copy, one design per size. Deterministic (no AI image spend). Replaces any prior fan-out for the row.", inputSchema: { type: "object", properties: { row: s("Copy row id.") }, required: ["row"] } },
+  { name: "generate_designs_for_project", description: "Generate designs for every row that has a headline. Capped at 60 designs total.", inputSchema: { type: "object", properties: { project: s("Project id.") }, required: ["project"] } },
 
   // ---- Assets / references / winners ----
   { name: "list_assets", description: "List a brand's logo/icon/asset bank.", inputSchema: { type: "object", properties: { brand: s("Brand slug.") }, required: ["brand"] } },
@@ -239,6 +257,20 @@ export async function callTool(userId: string, name: string, args: Record<string
       const r = await strategistOnly({ campaignId: c.id, brand: b, brief: c.brief, language: b.language, quarter: c.quarter || undefined, year: c.year || undefined, count, notes: args.notes ? String(args.notes) : undefined, userId });
       return text(`Seeded ${r.ideaCount} idea(s) on "${c.name}".`);
     }
+    case "add_idea_to_copy_sheet": {
+      const idea = getIdea(String(args.idea));
+      if (!idea) throw new Error(`No idea "${args.idea}".`);
+      const c = campaignFor(userId, idea.campaign_id);
+      const schema = getProjectCopySchema(c.id);
+      const values = layerCopyToRowValues(schema, {}, {
+        headline: (idea.hooks[0] || idea.theme || "").slice(0, 120),
+        subhead: (idea.promise || idea.insight || idea.angle || "").slice(0, 200),
+        cta: "Learn more",
+        eyebrow: "",
+      });
+      const row = createCopyRow(c.id, c.brand_id, values, (idea.theme || "Variation").slice(0, 80), idea.id);
+      return text(`Row ${row.id} ("${row.name}") created from idea ${idea.id}.`);
+    }
     case "generate_ads": {
       const c = campaignFor(userId, String(args.project));
       await rateLimit(userId, "generate_ads_mcp", { perMinute: 2 });
@@ -317,12 +349,73 @@ export async function callTool(userId: string, name: string, args: Record<string
       setGenerationWinner(g.id, on);
       return text(`${g.id} ${on ? "marked a winner ★" : "unmarked"}.`);
     }
+    case "list_ready_designs": {
+      const c = campaignFor(userId, String(args.project));
+      const ready = listReadyDesigns(c.id);
+      return text(ready.length
+        ? `${ready.length} design(s) ready to ship:\n` + ready.map((g) => `• ${g.id} — ${g.format_slug} ${g.width}x${g.height} · "${(g.headline || "").replace(/\n/g, " ")}"`).join("\n")
+        : "Nothing ready yet. A design ships when its row copy AND visual are both approved and it isn't stale.");
+    }
+    case "apply_copy_to_siblings": {
+      const g = generationFor(userId, String(args.id));
+      const count = applyCopyToRowSiblings(g.id);
+      return text(count > 0
+        ? `Applied this copy to ${count} other size${count === 1 ? "" : "s"} of the same row.`
+        : "No siblings to update — this design isn't fanned from a row, or it's the only size.");
+    }
 
     // ---------- Copy Sheet ----------
+    case "get_project_schema": {
+      const c = campaignFor(userId, String(args.project));
+      const schema = getProjectCopySchema(c.id);
+      const sizes = getProjectSizes(c.id);
+      const lines = [
+        `Project "${c.name}" — Copy Sheet schema:`,
+        "",
+        "Columns (cell keys you can fill via update_copy_row_cells / rewrite_cell / set_row_image):",
+        ...schema.columns.map((col) => `  • ${col.key} · "${col.label}"${col.layer !== "none" ? ` → layer:${col.layer}` : ""}${col.maxChars ? ` · ≤${col.maxChars}` : ""}${isMediaColumn(col) ? " · MEDIA" : ""}`),
+        "",
+        `Sizes (each row fans out to all of these): ${sizes.join(", ")}`,
+      ];
+      return text(lines.join("\n"));
+    }
     case "list_copy_rows": {
       const c = campaignFor(userId, String(args.project));
       const rows = listCopyRows(c.id);
-      return text(rows.length ? rows.map((r, i) => `#${i + 1} ${r.id} · ${r.status}${r.generation_id ? ` · linked ${r.generation_id}` : ""} · ${JSON.stringify(r.values).slice(0, 100)}`).join("\n") : "No copy rows.");
+      if (!rows.length) return text("No copy rows.");
+      return text(rows.map((r, i) => {
+        const designs = listDesignsForRow(r.id);
+        const stale = designs.filter((d) => d.stale).length;
+        return `#${i + 1} ${r.id} · "${r.name || "(unnamed)"}" · ${r.status} · ${designs.length} design${designs.length === 1 ? "" : "s"}${stale ? ` (${stale} stale)` : ""} · ${JSON.stringify(r.values).slice(0, 120)}`;
+      }).join("\n"));
+    }
+    case "add_copy_row": {
+      const c = campaignFor(userId, String(args.project));
+      const name = (args.name ? String(args.name) : "").trim().slice(0, 80);
+      const row = createCopyRow(c.id, c.brand_id, {}, name, null);
+      return text(`Row ${row.id} created${row.name ? ` ("${row.name}")` : ""}.`);
+    }
+    case "set_copy_row_name": {
+      const row = rowFor(userId, String(args.row));
+      const name = String(args.name || "").trim().slice(0, 80);
+      updateCopyRow(row.id, { name });
+      return text(`Row ${row.id} → "${name}".`);
+    }
+    case "update_copy_row_cells": {
+      const row = rowFor(userId, String(args.row));
+      const incoming = args.cells;
+      if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) throw new Error("cells must be a { columnKey: value } object.");
+      const schema = getProjectCopySchema(row.campaign_id);
+      const validKeys = new Set(schema.columns.map((c) => c.key));
+      const merged = { ...row.values };
+      const unknown: string[] = [];
+      for (const [k, v] of Object.entries(incoming)) {
+        if (!validKeys.has(k)) { unknown.push(k); continue; }
+        merged[k] = String(v ?? "");
+      }
+      updateCopyRow(row.id, { values: merged });
+      markRowDesignsStale(row.id);
+      return text(`Updated ${Object.keys(incoming).length - unknown.length} cell(s) on row ${row.id}.${unknown.length ? ` Ignored unknown columns: ${unknown.join(", ")}.` : ""}`);
     }
     case "set_copy_row_status": {
       const row = rowFor(userId, String(args.row));
@@ -331,28 +424,72 @@ export async function callTool(userId: string, name: string, args: Record<string
       updateCopyRow(row.id, { status: st });
       return text(`Row ${row.id} → ${st}.`);
     }
-    case "link_copy_row": {
+    case "delete_copy_row": {
       const row = rowFor(userId, String(args.row));
-      const g = generationFor(userId, String(args.creative));
-      if (g.campaign_id !== row.campaign_id) throw new Error("Creative isn't in the same project as the row.");
-      linkCopyRow(row.id, g.id);
-      return text(`Linked row ${row.id} ↔ creative ${g.id}.`);
+      const designCount = listDesignsForRow(row.id).length;
+      deleteCopyRow(row.id);
+      return text(`Row ${row.id} deleted.${designCount ? ` (Its ${designCount} fan-out design(s) remain in the project but are no longer linked to a row.)` : ""}`);
     }
-    case "push_row_to_creative": {
+    case "set_row_image": {
       const row = rowFor(userId, String(args.row));
-      if (!row.generation_id) throw new Error("Link the row to a creative first.");
+      const colKey = String(args.column);
       const schema = getProjectCopySchema(row.campaign_id);
-      updateGenerationCopy(row.generation_id, rowToLayerCopy(schema, row.values));
-      return text(`Pushed row copy → creative ${row.generation_id}.`);
+      const col = schema.columns.find((c) => c.key === colKey);
+      if (!col) throw new Error(`Column "${colKey}" not in this project. Use get_project_schema.`);
+      if (!isMediaColumn(col)) throw new Error(`"${col.label}" isn't a media column.`);
+      const refRaw = args.reference;
+      let refId: string | null = null;
+      if (refRaw && typeof refRaw === "string" && refRaw.toLowerCase() !== "null") {
+        const ref = getReference(refRaw);
+        if (!ref || ref.brand_id !== row.brand_id) throw new Error("That reference doesn't belong to this brand.");
+        refId = ref.id;
+      }
+      updateCopyRow(row.id, { values: { ...row.values, [colKey]: refId || "" } });
+      markRowDesignsStale(row.id);
+      return text(refId ? `Set row ${row.id} image → ${refId}.` : `Cleared row ${row.id} image.`);
     }
-    case "pull_row_from_creative": {
+    case "rewrite_cell": {
       const row = rowFor(userId, String(args.row));
-      if (!row.generation_id) throw new Error("Link the row to a creative first.");
-      const g = getGeneration(row.generation_id)!;
+      const action = String(args.action) as RewriteAction;
+      if (!["punchier", "shorter", "match_voice"].includes(action)) throw new Error("action must be punchier | shorter | match_voice.");
       const schema = getProjectCopySchema(row.campaign_id);
-      const values = layerCopyToRowValues(schema, row.values, { headline: g.headline || "", subhead: g.subhead || "", cta: g.cta || "", eyebrow: g.eyebrow || "" });
-      updateCopyRow(row.id, { values });
-      return text(`Pulled creative copy → row ${row.id}.`);
+      const colKey = String(args.column);
+      const col = schema.columns.find((c) => c.key === colKey);
+      if (!col) throw new Error(`Column "${colKey}" not in this project.`);
+      const b = getBrand(row.brand_id)!;
+      const ctx = rowToLayerCopy(schema, row.values);
+      const out = await rewriteCellCopy({
+        brand: b,
+        layer: (col.layer && col.layer !== "none" ? col.layer : "other") as any,
+        currentText: row.values[colKey] || "",
+        action,
+        maxChars: col.maxChars,
+        context: { ...ctx, rowName: row.name || undefined },
+      });
+      return text([`Proposed: ${out.proposed}`, out.rationale ? `Why: ${out.rationale}` : "", "", "(Tool returned the suggestion — call update_copy_row_cells to apply it.)"].filter(Boolean).join("\n"));
+    }
+    case "review_row_copy": {
+      const row = rowFor(userId, String(args.row));
+      const b = getBrand(row.brand_id)!;
+      const schema = getProjectCopySchema(row.campaign_id);
+      const copy = rowToLayerCopy(schema, row.values);
+      const r = await reviewRowCopy({ brand: b, copy, rowName: row.name || undefined });
+      const lines = [
+        `Score: ${(r.score * 100).toFixed(0)}/100`,
+        `Fix: ${r.fix}`,
+      ];
+      if (r.suggestion) lines.push(`Suggested ${r.suggestion.layer}: ${r.suggestion.proposed}`);
+      return text(lines.join("\n"));
+    }
+    case "generate_designs_for_row": {
+      const row = rowFor(userId, String(args.row));
+      const ds = generateDesignsForRow(row.campaign_id, row.id);
+      return text(`Fanned out ${ds.length} design(s) for row ${row.id}:\n` + ds.map((g) => `• ${g.id} — ${g.aspect} ${g.width}x${g.height}`).join("\n"));
+    }
+    case "generate_designs_for_project": {
+      const c = campaignFor(userId, String(args.project));
+      const res = generateDesignsForCampaign(c.id);
+      return text(`Generated ${res.designs} design(s) across ${res.rows} row(s).`);
     }
 
     // ---------- Assets / references / winners ----------
