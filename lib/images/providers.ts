@@ -112,7 +112,15 @@ export async function generateImage(prompt: string, aspectHint: string): Promise
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
   const chain = imageModelChain();
-  const fullPrompt = `${prompt}\n\nAspect ratio: ${aspectHint}. Photographic, real subject, single image, no text, no logos, no watermark.`;
+  // Lock the output to editorial photography. The Coursera demo (and the Vision
+  // QC critic) kept flagging abstract / 3D / illustrated outputs — these guards
+  // belong here too, in case a caller's prompt is softer than the art director's.
+  const fullPrompt = `${prompt}
+
+Aspect ratio: ${aspectHint}.
+EDITORIAL PHOTOGRAPHY. A real photograph of a real subject in a real environment, documentary or editorial style. Natural or studio-realistic light.
+Do NOT produce: illustration, 3D, CGI, render, vector, low-poly, isometric, anime, cartoon, painted, line art, abstract gradients, geometric patterns, particle effects, glowing UI surfaces, generic stock-icon clutter.
+Single image. No on-image text, no logos, no watermark.`;
 
   let lastError: string | null = null;
   for (const model of chain) {

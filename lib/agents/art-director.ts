@@ -47,10 +47,30 @@ export async function runArtDirector(input: ArtDirectorInput): Promise<{ output:
 async function runArtDirectorClaude(input: ArtDirectorInput): Promise<{ output: ArtDirectorOutput; rationale: string; usage: AgentUsage }> {
   const client = getClaude()!;
   const lang = (input.brand as any).language;
+  const tokens = (input.brand as any).tokens;
+  const audience = lang?.audience || input.idea.audience || "";
+  const voiceTone = Array.isArray(tokens?.voice?.tone) ? tokens.voice.tone.join(", ") : (tokens?.voice?.description || "");
+  const imageryStyle = tokens?.imagery?.style || "editorial";
+  const imageryTreatment = tokens?.imagery?.treatment || "natural";
   const system = agentSystem(
-    `You are a brand Art Director. You direct a photographic image generator. Pick composition, lighting, subject, and palette emphasis that feel native to this brand. The output is a single image prompt the generator will follow literally — write it as crisp, specific direction. No marketing language. Avoid logos and text in the image.`,
+    `You are a brand Art Director directing an EDITORIAL PHOTOGRAPHY image generator. Your output is the brief to a photographer, written so a generator follows it literally.
+
+ALWAYS:
+- A real photograph of a real subject in a real environment (documentary or editorial style).
+- Real human subjects where the brand calls for it — believable faces, hands, posture, gaze; cast for the audience.
+- Named light: direction, quality, time of day; specific environment (a desk, a kitchen, a sidewalk, a studio — not empty space).
+- A lens character when it serves the subject (e.g. 35mm wide-context, 50mm natural, 85mm portrait; shallow or deep DOF).
+- Color grade matching the brand's palette emphasis.
+
+NEVER:
+- Illustration, 3D, CGI, render, vector, low-poly, isometric, anime, cartoon, painted, line art.
+- Abstract gradients, geometric patterns, particle effects, glowing UI surfaces.
+- Stock-icon clutter — floating devices, perfect product mockups, generic charts and graphs.
+- Marketing language. On-image text, logos, watermarks.
+
+Pick composition, lighting, subject, and palette emphasis native to this brand. Make the brief specific enough that two photographers would shoot recognisably the same picture.`,
     input.brand,
-    lang || (input.brand as any).tokens.voice,
+    lang || tokens.voice,
   );
 
   const userText = [
@@ -58,8 +78,12 @@ async function runArtDirectorClaude(input: ArtDirectorInput): Promise<{ output: 
     `Angle: ${input.idea.angle}`,
     (input.idea as any).insight ? `Insight: ${(input.idea as any).insight}` : "",
     input.product ? `Product focus: ${input.product}` : "",
-    `Format: ${input.formatSlug} (aspect ${input.aspect})`,
-    input.referencePool?.length ? `Brand reference pool: ${input.referencePool.slice(0, 8).join("; ")}. Condition for subject consistency.` : "No brand references uploaded yet — invent from the brand's imagery treatment.",
+    audience ? `Audience: ${audience} — cast and direct the subject so this audience recognises themselves.` : "",
+    voiceTone ? `Brand voice/tone: ${voiceTone}.` : "",
+    input.brand.industry ? `Industry: ${input.brand.industry} — favour subjects native to this world (e.g. real learners at desks for edtech, real hands at devices for fintech), not generic stock motifs.` : "",
+    `Imagery direction: ${imageryStyle}, ${imageryTreatment}.`,
+    `Format: ${input.formatSlug} (aspect ${input.aspect}) — frame for this crop; vertical formats favour portrait subjects, wide formats favour environment.`,
+    input.referencePool?.length ? `Brand reference look: ${input.referencePool.slice(0, 8).join("; ")}. Match this grade and subject world.` : "No brand references uploaded yet — invent from the brand's imagery direction, but stay editorial.",
     input.notes ? `Operator notes: ${input.notes}` : "",
     "",
     "Direct one shot. Emit subject, composition, lighting, style keyword, palette emphasis (3-6 hex codes), and the full image prompt.",
@@ -122,14 +146,15 @@ async function runArtDirectorMock(input: ArtDirectorInput): Promise<{ output: Ar
     : undefined;
 
   const imagePrompt = [
+    `EDITORIAL PHOTOGRAPHY. A real photograph of a real subject in a real environment.`,
     `Subject: ${subject}`,
     `Composition: ${composition}`,
     `Lighting: ${lighting}`,
     `Style: ${style}, ${treatment}`,
     `Palette emphasis: ${palette.slice(0, 3).join(", ")} with accents of ${palette[5]}.`,
     `Aspect ratio: ${input.aspect}.`,
-    refSuggestion ? `Brand reference: condition on ${refSuggestion}.` : `Brand reference: ${input.brand.name}. Maintain subject consistency.`,
-    `Avoid: text in image, logos in image, watermark, AI artifacting.`,
+    refSuggestion ? `Brand reference: match the look/grade of ${refSuggestion}.` : `Brand reference: ${input.brand.name}. Maintain subject consistency.`,
+    `Avoid: illustration, 3D, CGI, vector, abstract gradients, geometric patterns, glowing UI, stock-icon clutter, text in image, logos in image, watermark, AI artifacting.`,
   ].join(" \n");
 
   const rationale = [
