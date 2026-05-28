@@ -6,6 +6,7 @@ import {
 } from "@/lib/repo";
 import { generateDesignsForRow, generateDesignsForCampaign } from "@/lib/copy-fanout";
 import { rewriteCellCopy, type RewriteAction, type Layer } from "@/lib/agents/copy-rewrite";
+import { reviewRowCopy } from "@/lib/agents/copy-critic";
 import { getBrand, createReference } from "@/lib/repo";
 import { saveUploadedImage } from "@/lib/images/providers";
 import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
@@ -163,6 +164,20 @@ export async function rewriteCellAction(campaignId: string, rowId: string, colum
     maxChars: col.maxChars,
     context: { ...context, rowName: row.name || undefined },
   });
+}
+
+// ---------- #56: per-row inline copy critic ----------
+// Run the copy critic against the row's mapped layer copy + brand voice.
+// Returns a 0–1 score, a one-line "what to fix" note, and (optionally) a
+// concrete single-layer rewrite the client can one-click apply.
+export async function reviewRowCopyAction(campaignId: string, rowId: string) {
+  const { campaign: c } = await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  const brand = getBrand(c.brand_id);
+  if (!brand) throw new Error("Brand missing.");
+  const schema = getProjectCopySchema(campaignId);
+  const copy = rowToLayerCopy(schema, row.values);
+  return reviewRowCopy({ brand, copy, rowName: row.name || undefined });
 }
 
 // ---------- #55: media cell — pick & upload ----------

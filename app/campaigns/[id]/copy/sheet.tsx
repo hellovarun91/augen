@@ -9,11 +9,13 @@ import { MediaCell, type ReferenceLite } from "./media-cell";
 import {
   addRowAction, updateRowAction, deleteRowAction, saveColumnsAction,
   setRowStatusAction, setRowNameAction, generateDesignsAction, generateAllDesignsAction,
-  rewriteCellAction,
+  rewriteCellAction, reviewRowCopyAction,
 } from "./actions";
 
 type RewriteAction = "punchier" | "shorter" | "match_voice";
 type RewriteResult = { proposed: string; rationale: string };
+type CopyLayer = "headline" | "subhead" | "cta" | "eyebrow";
+type RowReview = { score: number; fix: string; suggestion?: { layer: CopyLayer; proposed: string } | null };
 
 // A copy cell: blends into the grid, rings on interaction, auto-grows to its
 // content, only shows a counter as you approach the limit, and — when an
@@ -127,6 +129,8 @@ export function CopySheet({ campaignId, slug, schema, initialRows, initialDesign
   const [manageCols, setManageCols] = useState(false);
   const [newCol, setNewCol] = useState("");
   const [busyRow, setBusyRow] = useState<string | null>(null); // rowId | "all"
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<Record<string, RowReview>>({});
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -173,6 +177,27 @@ export function CopySheet({ campaignId, slug, schema, initialRows, initialDesign
       finally { setBusyRow(null); }
     });
   }
+  function reviewRow(rowId: string) {
+    setErr(null); setReviewBusy(rowId);
+    start(async () => {
+      try {
+        const res = await reviewRowCopyAction(campaignId, rowId);
+        setReviews((m) => ({ ...m, [rowId]: res }));
+      } catch (e: any) { setErr(e?.message || "Review failed"); }
+      finally { setReviewBusy(null); }
+    });
+  }
+  function applyReviewSuggestion(rowId: string, suggestion: { layer: CopyLayer; proposed: string }) {
+    const col = columns.find((c) => c.layer === suggestion.layer);
+    if (!col) return;
+    setCell(rowId, col.key, suggestion.proposed);
+    setReviews((m) => { const n = { ...m }; delete n[rowId]; return n; });
+    setTimeout(() => commit(rowId), 0); // let state propagate before saving
+  }
+  function dismissReview(rowId: string) {
+    setReviews((m) => { const n = { ...m }; delete n[rowId]; return n; });
+  }
+
   function generateAll() {
     setErr(null); setBusyRow("all");
     start(async () => {
@@ -283,6 +308,36 @@ export function CopySheet({ campaignId, slug, schema, initialRows, initialDesign
                           <option value="approved">Approved</option>
                         </select>
                       </div>
+                      <button onClick={() => reviewRow(r.id)} disabled={pending} className="text-[11px] text-ink-500 hover:text-indigo-200 disabled:opacity-50 self-start px-1">
+                        {reviewBusy === r.id ? "Reviewing…" : "✦ Review copy"}
+                      </button>
+                      {reviews[r.id] && (() => {
+                        const rv = reviews[r.id];
+                        const pct = Math.round(rv.score * 100);
+                        const tone = rv.score >= 0.8 ? "ring-emerald-400/30 bg-emerald-400/5 text-emerald-200"
+                          : rv.score >= 0.6 ? "ring-amber-400/30 bg-amber-400/5 text-amber-100"
+                          : "ring-rose-400/30 bg-rose-400/5 text-rose-100";
+                        return (
+                          <div className={"rounded-md ring-1 px-2 py-1.5 text-[11px] space-y-1.5 " + tone}>
+                            <div className="flex items-baseline gap-2">
+                              <span className="font-medium tabular-nums">{pct}</span>
+                              <span className="text-[11px] opacity-90 leading-snug">{rv.fix}</span>
+                            </div>
+                            {rv.suggestion && (
+                              <div className="text-[11px] text-ink-200 italic leading-snug border-l-2 border-white/10 pl-2">"{rv.suggestion.proposed}"</div>
+                            )}
+                            <div className="flex items-center gap-2 pt-0.5">
+                              {rv.suggestion && (
+                                <button onClick={() => applyReviewSuggestion(r.id, rv.suggestion!)}
+                                  className="text-[11px] rounded px-2 py-0.5 bg-white/10 text-ink-100 ring-1 ring-white/15 hover:bg-white/15">
+                                  Apply
+                                </button>
+                              )}
+                              <button onClick={() => dismissReview(r.id)} className="text-[11px] text-ink-400 hover:text-white">Dismiss</button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </td>
                   {columns.map((c) => (
