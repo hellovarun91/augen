@@ -1,16 +1,15 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 
-// Use a clean test database
+// Use a clean test database. lib/db.ts now honors AUGEN_DB_PATH (see tests/journey.test.ts).
 const testDbDir = path.join(process.cwd(), "data");
-const testDb = path.join(testDbDir, "test.db");
+const testDb = path.join(testDbDir, `test-critical-${process.pid}.db`);
 process.env.AUGEN_DB_PATH = testDb;
 
-beforeAll(() => {
-  // The repo currently hardcodes the DB path; for tests we'll just operate against the dev DB.
-  // (A small refactor to honor AUGEN_DB_PATH is a future improvement.)
-});
+function cleanup() { for (const ext of ["", "-shm", "-wal"]) { try { fs.unlinkSync(testDb + ext); } catch {} } }
+beforeAll(cleanup);
+afterAll(cleanup);
 
 describe("composer", () => {
   it("renders a valid SVG for 4:5 with all chrome elements", async () => {

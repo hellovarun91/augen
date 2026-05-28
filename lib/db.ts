@@ -21,7 +21,11 @@ let _db: Database.Database | null = null;
 
 export function db(): Database.Database {
   if (_db) return _db;
-  const filename = path.join(dataDir(), "augen.db");
+  // AUGEN_DB_PATH wins when set (tests use this for a sandboxed file); otherwise
+  // ${dataDir()}/augen.db. The parent directory is created if missing.
+  const filename = process.env.AUGEN_DB_PATH || path.join(dataDir(), "augen.db");
+  const dir = path.dirname(filename);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   _db = new Database(filename);
   _db.pragma("journal_mode = WAL");
   _db.pragma("foreign_keys = ON");
@@ -135,6 +139,12 @@ function migrate(d: Database.Database) {
     confidence REAL NOT NULL DEFAULT 0.8,
     notes TEXT,
     cost_cents INTEGER NOT NULL DEFAULT 0,
+    -- Journey columns also added as idempotent ALTERs above; keep both in sync.
+    reference_id TEXT,
+    copy_row_id TEXT,
+    stale INTEGER NOT NULL DEFAULT 0,
+    design_score REAL,
+    design_notes TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
@@ -538,14 +548,19 @@ function migrate(d: Database.Database) {
   CREATE INDEX IF NOT EXISTS brand_assets_brand_idx ON brand_assets(brand_id);
 
   -- Copy Sheet rows — per-project copy, keyed by the project's columns.
+  -- The journey columns (name, generation_id, idea_id) are also added as
+  -- idempotent ALTERs above for DBs that pre-date them; keep both in sync.
   CREATE TABLE IF NOT EXISTS copy_rows (
     id TEXT PRIMARY KEY,
     campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
     brand_id TEXT NOT NULL,
+    name TEXT,
     values_json TEXT NOT NULL DEFAULT '{}',
     status TEXT NOT NULL DEFAULT 'draft',
     order_idx INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    generation_id TEXT,
+    idea_id TEXT
   );
   CREATE INDEX IF NOT EXISTS copy_rows_campaign_idx ON copy_rows(campaign_id);
 
