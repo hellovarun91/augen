@@ -3,8 +3,9 @@ import { formatBySlug } from "./formats";
 import {
   getCampaign, getBrand, getCopyRow, createGeneration, deleteGeneration,
   listDesignsForRow, getProjectSizes, getProjectCopySchema, linkCopyRow, listCopyRows,
+  updateGenerationReference, getReference,
 } from "./repo";
-import { rowToLayerCopy } from "./copy-schema";
+import { rowToLayerCopy, isMediaColumn } from "./copy-schema";
 import type { Generation } from "./types";
 
 const FANOUT_CAP = 60; // safety cap on total designs per "generate all"
@@ -37,11 +38,18 @@ export function generateDesignsForRow(campaignId: string, rowId: string): Genera
     brand.tokens.palette.background, brand.tokens.palette.surface, brand.tokens.palette.foreground,
     brand.tokens.palette.primary, brand.tokens.palette.secondary, brand.tokens.palette.accent,
   ];
-  const out: Generation[] = [];
+  // Per-row image override (#55): if the row has an image-cell value pointing
+  // at a brand reference, every design in this fan-out uses it. Otherwise the
+  // design renders without a specific reference (composer falls back to SVG).
+  const mediaCol = schema.columns.find(isMediaColumn);
+  const refId = mediaCol ? (row.values[mediaCol.key] || "").trim() : "";
+  const validRef = refId ? getReference(refId) : null;
+  const effectiveRefId = validRef && validRef.brand_id === brand.id ? validRef.id : null;
+
   for (const slug of formats) {
     const fmt = formatBySlug(slug);
     if (!fmt) continue;
-    out.push(createGeneration({
+    const gen = createGeneration({
       campaignId, ideaId: null, brandId: brand.id,
       formatSlug: slug, aspect: fmt.aspect, width: fmt.width, height: fmt.height,
       headline: copy.headline, subhead: copy.subhead, cta: copy.cta, eyebrow: copy.eyebrow || undefined,
@@ -52,9 +60,11 @@ export function generateDesignsForRow(campaignId: string, rowId: string): Genera
       palette,
       confidence: 0.8, costCents: 0,
       copyRowId: rowId,
-    }));
+    });
+    if (effectiveRefId) updateGenerationReference(gen.id, effectiveRefId);
   }
-  return out;
+  // Return fresh-from-DB designs so callers see post-create updates (e.g. reference_id).
+  return listDesignsForRow(rowId);
 }
 
 export interface FanoutResult { rows: number; designs: number }

@@ -3,8 +3,9 @@ import { Button, Eyebrow } from "@/components/ui/primitives";
 import { useState, useEffect, useRef, useTransition } from "react";
 import Link from "next/link";
 import type { CopySchema, CopyColumn } from "@/lib/copy-schema";
-import { classifyLabel } from "@/lib/copy-schema";
+import { classifyLabel, isMediaColumn } from "@/lib/copy-schema";
 import type { CopyRow } from "@/lib/repo";
+import { MediaCell, type ReferenceLite } from "./media-cell";
 import {
   addRowAction, updateRowAction, deleteRowAction, saveColumnsAction,
   setRowStatusAction, setRowNameAction, generateDesignsAction, generateAllDesignsAction,
@@ -115,9 +116,10 @@ const STATUS_TONE: Record<string, string> = {
   approved: "bg-emerald-400/10 text-emerald-200 ring-emerald-400/20",
 };
 
-export function CopySheet({ campaignId, slug, schema, initialRows, initialDesigns }: {
+export function CopySheet({ campaignId, slug, schema, initialRows, initialDesigns, references }: {
   campaignId: string; slug: string; schema: CopySchema; initialRows: CopyRow[];
   initialDesigns: Record<string, DesignLite[]>;
+  references: ReferenceLite[];
 }) {
   const [columns, setColumns] = useState<CopyColumn[]>(schema.columns);
   const [rows, setRows] = useState<RowState[]>(initialRows.map((r) => ({ id: r.id, name: r.name || "", values: { ...r.values }, status: r.status })));
@@ -285,13 +287,24 @@ export function CopySheet({ campaignId, slug, schema, initialRows, initialDesign
                   </td>
                   {columns.map((c) => (
                     <td key={c.key} className="px-1.5 py-1.5 border-l border-white/5 align-top">
-                      <CellBox
-                        value={r.values[c.key] || ""}
-                        maxChars={c.maxChars}
-                        onChange={(val) => setCell(r.id, c.key, val)}
-                        onBlur={() => commit(r.id)}
-                        onRewrite={(action) => rewriteCellAction(campaignId, r.id, c.key, action)}
-                      />
+                      {isMediaColumn(c) ? (
+                        <MediaCell
+                          campaignId={campaignId}
+                          rowId={r.id}
+                          columnKey={c.key}
+                          value={r.values[c.key] || ""}
+                          references={references}
+                          onChange={(val) => setCell(r.id, c.key, val)}
+                        />
+                      ) : (
+                        <CellBox
+                          value={r.values[c.key] || ""}
+                          maxChars={c.maxChars}
+                          onChange={(val) => setCell(r.id, c.key, val)}
+                          onBlur={() => commit(r.id)}
+                          onRewrite={(action) => rewriteCellAction(campaignId, r.id, c.key, action)}
+                        />
+                      )}
                     </td>
                   ))}
                   <td className="px-3 py-2 border-l border-white/5 align-top">

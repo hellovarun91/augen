@@ -141,6 +141,14 @@ export function layerCopyToRowValues(schema: CopySchema, current: Record<string,
   return next;
 }
 
+// True for columns that hold an IMAGE (not text about the image). Used by the
+// sheet (#55) to render a media picker, and by the fan-out engine to apply a
+// per-row image override to the row's generated designs.
+const BARE_IMAGE_LABEL = /^(image|hero|hero image|photo|picture|visual|imagery|media)$/i;
+export function isMediaColumn(c: CopyColumn): boolean {
+  return BARE_IMAGE_LABEL.test(c.label.trim());
+}
+
 export const COPY_ROW_STATUSES = ["draft", "proof", "approved"] as const;
 export type CopyRowStatus = (typeof COPY_ROW_STATUSES)[number];
 export const copyRowStatusLabel = (s: string) => s === "proof" ? "In proof" : s === "approved" ? "Approved" : "Draft";

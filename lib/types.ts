@@ -198,6 +198,7 @@ export interface GenerationRow {
   cost_cents: number;
   copy_row_id: string | null; // source Copy Sheet row, when fanned out (#47)
   stale: number;              // 1 = copy diverged from its row; needs re-render (#49)
+  reference_id: string | null; // image reference attached (brand asset / upload / stock)
   created_at: number;
   updated_at: number;
 }

@@ -6,7 +6,8 @@ import {
 } from "@/lib/repo";
 import { generateDesignsForRow, generateDesignsForCampaign } from "@/lib/copy-fanout";
 import { rewriteCellCopy, type RewriteAction, type Layer } from "@/lib/agents/copy-rewrite";
-import { getBrand } from "@/lib/repo";
+import { getBrand, createReference } from "@/lib/repo";
+import { saveUploadedImage } from "@/lib/images/providers";
 import { CopySchema, COPY_ROW_STATUSES, rowToLayerCopy, layerCopyToRowValues } from "@/lib/copy-schema";
 import { requireCampaignAccess } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
@@ -162,6 +163,49 @@ export async function rewriteCellAction(campaignId: string, rowId: string, colum
     maxChars: col.maxChars,
     context: { ...context, rowName: row.name || undefined },
   });
+}
+
+// ---------- #55: media cell — pick & upload ----------
+const MEDIA_UPLOAD_MAX = 12 * 1024 * 1024;
+
+// Set (or clear) the image-cell value to a brand reference id. Triggers the
+// row-designs-stale rule when the media diverges (#49).
+export async function setRowImageAction(campaignId: string, rowId: string, columnKey: string, refId: string | null) {
+  await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  const next = { ...row.values, [columnKey]: refId || "" };
+  updateCopyRow(rowId, { values: next });
+  markRowDesignsStale(rowId);
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+}
+
+// Upload an image, register it as a brand reference, and set the row's image
+// cell to it. Returns the new reference id so the client can place it.
+export async function uploadRowImageAction(campaignId: string, rowId: string, columnKey: string, fd: FormData) {
+  const { campaign: c } = await requireCampaignAccess(campaignId);
+  const row = rowInProject(campaignId, rowId);
+  const brand = getBrand(c.brand_id);
+  if (!brand) throw new Error("Brand missing.");
+  const file = fd.get("file") as File | null;
+  if (!file || !file.size) throw new Error("Pick an image.");
+  if (file.size > MEDIA_UPLOAD_MAX) throw new Error("Image too large (max 12MB).");
+  if (!/^image\//.test(file.type || "")) throw new Error("File must be an image.");
+  const buf = Buffer.from(await file.arrayBuffer());
+  const saved = await saveUploadedImage(brand.slug, { name: file.name, mime: file.type || "image/jpeg", bytes: buf });
+  const ref = createReference({
+    brandId: brand.id,
+    kind: "upload",
+    source: "sheet-upload",
+    label: `${row.name || "Row"} · ${file.name}`,
+    filePath: saved.publicPath,
+    mime: saved.mime,
+    tags: ["sheet", "row-image"],
+  });
+  const next = { ...row.values, [columnKey]: ref.id };
+  updateCopyRow(rowId, { values: next });
+  markRowDesignsStale(rowId);
+  revalidatePath(`/campaigns/${campaignId}/copy`);
+  return { refId: ref.id, filePath: ref.file_path, label: ref.label };
 }
 
 // Approve & send to design in one step: mark approved, then push if linked.

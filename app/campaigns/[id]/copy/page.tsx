@@ -1,4 +1,4 @@
-import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign, listDesignsByRow, journeyProgress } from "@/lib/repo";
+import { getCampaign, getBrand, getProjectCopySchema, syncCopyRowsForCampaign, listDesignsByRow, journeyProgress, listReferences } from "@/lib/repo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { SyncActiveBrand } from "@/components/sync-active-brand";
@@ -35,7 +35,14 @@ export default async function ProjectCopyPage({ params }: { params: Promise<{ id
 
       <JourneyNav campaignId={campaign.id} current="copy" progress={journeyProgress(campaign.id)} />
 
-      <CopySheet campaignId={campaign.id} slug={brand.slug} schema={schema} initialRows={rows} initialDesigns={initialDesigns} />
+      <CopySheet
+        campaignId={campaign.id}
+        slug={brand.slug}
+        schema={schema}
+        initialRows={rows}
+        initialDesigns={initialDesigns}
+        references={listReferences(brand.id).map((r) => ({ id: r.id, label: r.label, file_path: r.file_path, mime: r.mime, kind: r.kind }))}
+      />
     </div>
   );
 }

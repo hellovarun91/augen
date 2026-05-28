@@ -2,7 +2,7 @@ import { db, nowMs } from "./db";
 import { nanoid } from "nanoid";
 import { createHash, randomBytes } from "crypto";
 import { BrandLanguage, BrandTokens, type Brand, type BrandRow, type Campaign, type CampaignRow, type CampaignBrief, type Generation, type GenerationRow, type Idea, type IdeaRow } from "./types";
-import { parseCopySchema, defaultCopySchema, layerCopyToRowValues, rowToLayerCopy, type CopySchema } from "./copy-schema";
+import { parseCopySchema, defaultCopySchema, layerCopyToRowValues, rowToLayerCopy, isMediaColumn, type CopySchema } from "./copy-schema";
 import { defaultProjectSizes } from "./formats";
 
 export function listBrands(): Brand[] {
@@ -297,15 +297,19 @@ export function listDesignsByRow(campaignId: string): Record<string, Generation[
 const STALE_AND_CLEAR_APPROVAL =
   "UPDATE generations SET stale = ?, status = CASE WHEN status='approved' THEN 'needs_revision' ELSE status END, updated_at = ? WHERE id = ?";
 
-// Row copy changed → mark every design whose copy now differs from the row stale,
-// and clear any visual approval. Precise: untouched designs aren't disturbed.
+// Row copy (or media) changed → mark every design that now diverges from the row
+// stale, and clear any visual approval. Precise: untouched designs aren't disturbed.
 export function markRowDesignsStale(rowId: string) {
   const row = getCopyRow(rowId); if (!row) return;
-  const want = rowToLayerCopy(getProjectCopySchema(row.campaign_id), row.values);
+  const schema = getProjectCopySchema(row.campaign_id);
+  const want = rowToLayerCopy(schema, row.values);
+  const mediaCol = schema.columns.find(isMediaColumn);
+  const wantRefId = mediaCol ? ((row.values[mediaCol.key] || "").trim() || null) : null;
   for (const d of listDesignsForRow(rowId)) {
-    const differs = (d.headline || "") !== want.headline || (d.subhead || "") !== want.subhead
+    const copyDiffers = (d.headline || "") !== want.headline || (d.subhead || "") !== want.subhead
       || (d.cta || "") !== want.cta || (d.eyebrow || "") !== (want.eyebrow || "");
-    if (differs) db().prepare(STALE_AND_CLEAR_APPROVAL).run(1, nowMs(), d.id);
+    const mediaDiffers = mediaCol ? (d.reference_id || null) !== wantRefId : false;
+    if (copyDiffers || mediaDiffers) db().prepare(STALE_AND_CLEAR_APPROVAL).run(1, nowMs(), d.id);
   }
 }
 
